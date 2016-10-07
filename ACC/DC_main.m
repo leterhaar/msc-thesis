@@ -20,8 +20,8 @@ zeta = 5*dc.N_G;                    % Helly-dimsension
 beta = 1e-5;                            % confidence parameter
 
 % determine number of scenarios to generate based on Eq (2-4)
-N = ceil(2/epsilon*(zeta-1+log(1/beta)))
-N = 200;
+N = ceil(2/epsilon*(zeta-1+log(1/beta)));
+N = 100;
 % generate scenarios
 wind.generate(N);
 t_wind = 8;
@@ -33,8 +33,7 @@ cut_index = ceil(linspace(1, N+1, N_agents+1));
 
 % generate random connection graph with fixed diameter
 dm = 3;
-% G = random_graph(N_agents, dm, 'rand');
-load('graph.mat');
+G = random_graph(N_agents, dm, 'rand');
 % plot(digraph(G))
 %% create and init agents
 prg = progress('Initializing agents', N_agents);
@@ -48,7 +47,7 @@ t = 1;
 infeasible = 0;
 
 % while not converged and still feasible
-while ngc < 2*dm+1 && not(infeasible)
+while ngc < 2*dm+1 && not(infeasible) && t < 7
     prg = progress(sprintf('Iteration %i',t), N_agents);
     
     % loop over agents
@@ -111,18 +110,24 @@ end
 % check the solution against all constraints a posteriori
 tic
 x = sdpvar(5*dc.N_G, 1, 'full');
-assign(x, xstar(:,1));
+
 C_all = DC_f_0(x, dc, wind, t_wind);
 
 for i = 1:N
-        C_all = [C_all, DC_f_eq(x, i, dc, wind, t_wind)];
         C_all = [C_all, DC_f_ineq(x, i, dc, wind, t_wind)];
 end
 
-if all(check(C_all) >= -1e-6)
-    fprintf('Solution is feasible for all original constraints\n')
+feasible_for_all = 1;
+for i = 1:N_agents
+    assign(x, xstar(:,i));
+    if all(check(C_all) < -1e-6)
+        feasible_for_all = 0;
+    end
+end
+if feasible_for_all
+    fprintf('All solutions are feasible for all original constraints\n')
 else
-    fprintf('(!) Solution is infeasible for all original constraints\n');
+    fprintf('(!) Some solution is infeasible for all original constraints\n');
 end
 
 % calculate central solution

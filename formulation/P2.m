@@ -126,6 +126,9 @@ C = [C, W_m(k_ref, k_ref) == 0];
 % Nonnegativity constraints on reserve bounds
 C = [C, R_us >= 0, R_ds >= 0];
 
+% d_ds and d_us should always sum to 1
+C = [C, ones(1, ac.N_G)*d_us == 1, ones(1, ac.N_G)*d_ds == 1];
+
 %% Optimize
 opt = sdpsettings('verbose', 0, 'debug', 1, 'solver', 'mosek');
 diagnostics = optimize(C, Obj, opt);
@@ -167,8 +170,8 @@ for i = 1:N
 end
 % output ranks and table with results
 decided_vars = {Wf_opt, Ws_opt, Rus_opt, Rds_opt, dus_opt, dds_opt};
-% fprintf('===============\nR1 : base R on W_m\n===============\n');
-% format_result(ac, wind, t, decided_vars, R1);
+fprintf('===============\nR1 : base R on W_m\n===============\n');
+format_result(ac, wind, t, decided_vars, R1);
 fprintf('===============\nR2 : based R on d_us, d_ds\n===============\n');
 format_result(ac, wind, t, decided_vars, R2);
 

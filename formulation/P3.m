@@ -15,14 +15,13 @@ ac = AC_model('case14');
 ac.set_WPG_bus(9);
 figure(1);
 ac.draw_network();
-ac.P_D = ac.P_D .* 2;
 
 N_t = 24;
 wind = wind_model(ac, N_t, 0.2);
 
 % define sample complexity 
-N = 10000;
-% wind.dummy(N);
+N = 5;
+wind.dummy(N);
 % wind.use_forecast();
 wind.generate(N);
 wind2 = copy(wind);

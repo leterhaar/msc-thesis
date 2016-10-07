@@ -1,0 +1,1 @@
+set(gcf, 'WindowStyle', 'docked');

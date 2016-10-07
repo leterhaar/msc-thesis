@@ -69,6 +69,8 @@ Cons = [Cons, ...
 % Non-negativity constraints for reserve requirements       
 Cons = [Cons, R_us >= 0, R_ds >= 0];
 
+Cons = [Cons, ones(1,dc.N_G)*d_ds == 1, ones(1,dc.N_G)*d_us == 1];
+
 %% Define scenario constraints
 
 % loop over scenarios
@@ -97,8 +99,8 @@ end
 %% the same as the three cells above
 decision_vars = {P_G, R_us, R_ds, d_us, d_ds};
 
-p = formulate('DC');
-[Obj, Cons] = p.prepare(dc, wind, t, decision_vars);
+% p = formulate('DC');
+% [Obj, Cons] = p.prepare(dc, wind, t, decision_vars);
 
 %% Optimize
 opt = sdpsettings('verbose', 1);

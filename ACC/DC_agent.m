@@ -32,13 +32,9 @@ classdef DC_agent < handle
             
             % loop over scenarios to create scenario constraints
             C_ineqs = [];
-            C_eqs = [];
             ag.C_1_params = [];
             
-            for i = i_start:i_end
-                % equality constraints
-                C_eqs = [C_eqs, DC_f_eq(ag.x, i, dc, wind, t_wind)];
-                    
+            for i = i_start:i_end                    
                 % inequality constraints
                 [C_ineq, C_params] = DC_f_ineq(ag.x, i, dc, wind, t_wind);
                 C_ineqs = [C_ineqs, C_ineq];
@@ -54,13 +50,19 @@ classdef DC_agent < handle
         
             % optimize
             opt = sdpsettings('verbose', 0);
-            optimize([ag.C_0, C_eqs, C_ineqs], ag.Obj, opt);
+            optimize([ag.C_0, C_ineqs], ag.Obj, opt);
 
             % store value of objective function
             ag.J(1) = value(ag.Obj);
             ag.Jtilde = -1e9;
             
             % store active constraints
+%             ag.A{1} = [];
+%             xstar = value(ag.x);
+%             for i = i_start:i_end
+%                 ag.A{1} = [ag.A{1}; ...
+%                            DC_f_ineq_active(xstar, i, dc, wind, t_wind)];
+%             end
             ag.A{1} = ag.C_1_params(Ac(C_ineqs), :);
 
             % set t to 1
@@ -96,7 +98,7 @@ classdef DC_agent < handle
                 ag.L = unique([ag.L; ag.C_1_params; ag.A{ag.t}], 'rows');
 
                 % build constraints from L
-                C_ineqs = [];
+                C_L = [];
                 for params = ag.L'
                     
                     % extract params
@@ -104,29 +106,21 @@ classdef DC_agent < handle
                     j = params(2);
                     
                     % add constraints to set C_L
-                    C_ineqs = [C_ineqs, ...
+                    C_L = [C_L, ...
                            DC_f_ineq(ag.x, i, ag.dc, ag.wind, ag.t_wind, j)];
                 end
                 
-                % build equality constraints
-                C_eqs = [];
-                for i = unique(ag.L(:,1))'
-                    C_eqs = [C_eqs, ...
-                                DC_f_eq(ag.x, i, ag.dc, ag.wind, ag.t_wind)];
-                end
-
                 % check if current value for x is infeasible for the new 
                 % constraints
-                C_L = [C_eqs, C_ineqs];
                 if any(check(C_L) < -1e-6) || any(isnan(check(C_L)))
 
                     % if infeasible with new constraints, optimize again
                     opt = sdpsettings('verbose', 0);
                     optimize([ag.C_0, C_L], ag.Obj, opt);
                 end
-                    
+                
                 % update A
-                ag.A{ag.t + 1} = ag.L(Ac(C_ineqs), :);
+                ag.A{ag.t + 1} = ag.L(Ac(C_L), :);
 
                 % update J
                 ag.J(ag.t + 1) = value(ag.Obj);

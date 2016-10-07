@@ -55,7 +55,7 @@ for j = 1:ac.N_G
 end
 
 % Reserve requirements
-lambda = 0.5;
+lambda = 1;
 Obj = Obj + lambda*(ac.c_us' * R_us + ac.c_ds' * R_ds);         
 
 %% Define constraints
@@ -67,12 +67,12 @@ k_ref = ac.N_b + ac.refbus;
 for k = 1:ac.N_b
     % P_inj (1)
     C = [C, ac.P_min(k) ...
-        <= trace(ac.Y_k(k)*W_f) + ac.P_D(k) - ac.C_w(k)*wind.P_wf(t) <= ...
+        <= trace(ac.Y_k(k)*W_f) + ac.P_D(t, k) - ac.C_w(k)*wind.P_wf(t) <= ...
            ac.P_max(k)];
 
     % Q_inj (2)
     C = [C, ac.Q_min(k) ...
-        <= trace(ac.Ybar_k(k)*W_f) + ac.Q_D(k) <=...
+        <= trace(ac.Ybar_k(k)*W_f) + ac.Q_D(t, k) <=...
            ac.Q_max(k)];
 
     % V_bus (3)
@@ -86,12 +86,12 @@ for i = 1:N
     for k = 1:ac.N_b
         % P_inj (1)
         C = [C, ac.P_min(k) ...
-            <= trace(ac.Y_k(k)*W_s(:,:,i)) + ac.P_D(k) - ac.C_w(k)*wind.P_w(t, i) <= ...
+            <= trace(ac.Y_k(k)*W_s(:,:,i)) + ac.P_D(t, k) - ac.C_w(k)*wind.P_w(t, i) <= ...
                ac.P_max(k)];
 
         % Q_inj (2)
         C = [C, ac.Q_min(k) ...
-             <= trace(ac.Ybar_k(k)*W_s(:,:,i)) + ac.Q_D(k) <= ...
+             <= trace(ac.Ybar_k(k)*W_s(:,:,i)) + ac.Q_D(t, k) <= ...
                 ac.Q_max(k)];
 
         % V_bus (3)
@@ -130,11 +130,14 @@ C = [C, W_f(k_ref, k_ref) == 0];
 % Nonnegativity constraints on reserve bounds
 C = [C, R_us >= 0, R_ds >= 0];
 
+C = [C, ones(1, ac.N_G)*d_us == 1, ones(1, ac.N_G)*d_ds == 1];
+
+
 %% same as above 2 cells, but then in struct
-p = formulate('P1');
+% p = formulate('P1');
 decision_vars = {W_f, W_s, R_us, R_ds, d_us, d_ds};
 % costs = {c_G, c_us, c_ds};
-[Obj, C] = p.prepare(ac, wind, t, decision_vars, 0.5);
+% [Obj, C] = p.prepare(ac, wind, t, decision_vars, 0.5);
 
 %% Optimize
 opt = sdpsettings('verbose', 0, 'debug', 1, 'solver', 'mosek');
@@ -174,7 +177,7 @@ for i = 1:N
         
         % calculate P_G
         if i == 1
-            P_G(j) = trace(ac.Y_k(k) * Wf_opt) + ac.P_D(k) - ac.C_w(k)*wind.P_wf(k);
+            P_G(j) = trace(ac.Y_k(k) * Wf_opt) + ac.P_D(t, k) - ac.C_w(k)*wind.P_wf(k);
         end
     end
 end
@@ -187,5 +190,3 @@ if diagnostics.problem ~= 0
 else
     fprintf('%s\n\n',diagnostics.info);
 end
-
-p.evaluate(ac, wind, t, decided_vars);
