@@ -1,0 +1,79 @@
+function [P_tr P_s P_f P_m N_chain] = moves_TrM_forecast()
+% P_tr : Generate Transition Matrix P_tr
+%% load wind power data
+% load data_wind_forecast
+% P_f = Pf_mh_new/max(Pf_mh_new);
+% P_m = Pm_new/max(Pf_mh_new);
+
+load data_wind_f1
+P_f = data_wind_f(:,1); % forecasted value
+P_m = data_wind_f(:,2); % measured value
+
+P_f(find(isnan(P_f)))=[];
+P_m(find(isnan(P_m)))=[];
+P_e = -(P_m - P_f);
+P_e_min = min(P_e);
+P_e_max = max(P_e);
+Delta = 0; % number of steps until next hour, since 15min data
+
+%% create the transition probability matrix
+N_g = 41; % number of states of the chain, including 'P_e_min' and 'P_e_max'
+N_chain = N_g;
+Delta_P = (P_e_max-P_e_min)/(N_g-1); % discretization step
+p_bin_ind = 1:1:N_g-2;
+p_bin = P_e_min + p_bin_ind*Delta_P; % value of wind power error P_e at the grid points (except of 'P_e_min' and 'P_e_max')
+p_binU = p_bin + 0.5*Delta_P; % thresholds left to each grid point
+p_binD = p_bin - 0.5*Delta_P; % thresholds right to each grid point
+
+% assign each element of P_m to an element of p_bin
+for i = 1:1:N_g-2
+    D{i} = (P_e > p_binD(i)).*(P_e <= p_binU(i));
+end
+D_0 = (P_e <= p_binD(1));
+D_P_N = (P_e > p_binU(end));
+P = zeros(size(P_e));
+for i = 1:1:N_g-2
+    P = P + D{i}*p_bin(i);
+end
+P = P + D_0*P_e_min + D_P_N*P_e_max; 
+
+P_s = [P_e_min p_bin P_e_max]; % vector with elements the N_g states of the chain (in p.u. values)
+n_b = zeros(N_g,N_g); % number of traansitions i->j encountered in P_s
+P_s_ij = [];
+i_ind = [];
+j_ind = [];
+for i = 1:1:N_g
+    for j = 1:1:N_g
+        P_s_ij = [P_s_ij; [P_s(i) P_s(j)]];
+        i_ind = [i_ind; i];
+        j_ind = [j_ind; j];
+    end
+end
+for k = 1:1:size(P,1)-1-Delta
+    is_in_P_s = P_s_ij==repmat([P(k) P(k+1+Delta)],size(j_ind,1),1);
+    [in_pos in_bin] = find(sum(is_in_P_s,2)==2); % find the position in is_in_P_s where the element (i,j) is
+    if sum(in_bin)~=0
+        n_b(i_ind(in_pos),j_ind(in_pos)) = n_b(i_ind(in_pos),j_ind(in_pos)) + 1;
+    end
+end
+n_b_sum = sum(n_b,2);
+% find the zeros in n_b_sum
+[pos_z ind_z] = find(n_b_sum==0);
+for i = 1:1:N_g
+    P_tr(i,:) = n_b(i,:)/n_b_sum(i);
+end
+% assume equal transition probabilities in case the element (i,j) was
+% not found in P (i.e. a zero in n_b_sum)
+if sum(ind_z)~=0
+    for i = 1:1:size(ind_z,1)
+        P_tr(pos_z(i),:) = (1/N_g)*ones(size(P_tr(1,1,:)));
+    end
+end
+
+%% Plotting
+% figure(1) % plot the ptrobability transition matrix P_tr
+% bar3(P_tr)
+% xlim([0 N_g+1]);
+% ylim([0 N_g+1]);
+% view(3)
+
