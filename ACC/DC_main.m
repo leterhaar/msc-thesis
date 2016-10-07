@@ -32,7 +32,7 @@ assert(N >= N_agents, 'There cannot be more agents than scenarios');
 cut_index = ceil(linspace(1, N+1, N_agents+1));
 
 % generate random connection graph with fixed diameter
-dm = 3;
+dm = 2;
 G = random_graph(N_agents, dm, 'rand');
 % plot(digraph(G))
 %% create and init agents
