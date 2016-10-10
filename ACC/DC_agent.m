@@ -27,7 +27,7 @@ classdef DC_agent < handle
             % create objective function
             ag.Obj = DC_f_obj(ag.x, dc, wind, t_wind);
 
-            % create deterministic constraint
+            % create deterministic constraints
             ag.C_0 = DC_f_0(ag.x, dc, wind, t_wind);
             
             % loop over scenarios to create scenario constraints
@@ -56,13 +56,7 @@ classdef DC_agent < handle
             ag.J(1) = value(ag.Obj);
             ag.Jtilde = -1e9;
             
-            % store active constraints
-%             ag.A{1} = [];
-%             xstar = value(ag.x);
-%             for i = i_start:i_end
-%                 ag.A{1} = [ag.A{1}; ...
-%                            DC_f_ineq_active(xstar, i, dc, wind, t_wind)];
-%             end
+            % store params of active constraints
             ag.A{1} = ag.C_1_params(Ac(C_ineqs), :);
 
             % set t to 1
@@ -117,7 +111,7 @@ classdef DC_agent < handle
                     % if infeasible with new constraints, optimize again
                     opt = sdpsettings('verbose', 0);
                     optimize([ag.C_0, C_L], ag.Obj, opt);
-                end
+                end                
                 
                 % update A
                 ag.A{ag.t + 1} = ag.L(Ac(C_L), :);

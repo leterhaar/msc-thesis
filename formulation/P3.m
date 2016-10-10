@@ -42,11 +42,8 @@ R_ds = sdpvar(ac.N_G, 1);
 figure(2);
 wind.plot(t);
 pause(0.001); % to show plot
-for foo = []
 
 %% Define objective
-    display('I should skip this');
-
 Obj = 0;
 
 % P_G for every generator
@@ -68,12 +65,12 @@ k_ref = ac.N_b + ac.refbus;
 for k = 1:ac.N_b
     % P_inj (1)
     C = [C, ac.P_min(k) ...
-        <= trace(ac.Y_k(k)*W_f) + ac.P_D(k) - ac.C_w(k)*wind.P_wf(t) <= ...
+        <= trace(ac.Y_k(k)*W_f) + ac.P_D(t, k) - ac.C_w(k)*wind.P_wf(t) <= ...
            ac.P_max(k)];
 
     % Q_inj (2)
     C = [C, ac.Q_min(k) ...
-        <= trace(ac.Ybar_k(k)*W_f) + ac.Q_D(k) <=...
+        <= trace(ac.Ybar_k(k)*W_f) + ac.Q_D(t, k) <=...
            ac.Q_max(k)];
 
     % V_bus (3)
@@ -89,12 +86,12 @@ for i = 1:N
     for k = 1:ac.N_b
         % P_inj (1)
         C = [C, ac.P_min(k) ...
-            <= trace(ac.Y_k(k)*W_s) + ac.P_D(k) - ac.C_w(k)*wind.P_w(t, i) <= ...
+            <= trace(ac.Y_k(k)*W_s) + ac.P_D(t, k) - ac.C_w(k)*wind.P_w(t, i) <= ...
                ac.P_max(k)];
 
         % Q_inj (2)
         C = [C, ac.Q_min(k) ...
-             <= trace(ac.Ybar_k(k)*W_s) + ac.Q_D(k) <= ...
+             <= trace(ac.Ybar_k(k)*W_s) + ac.Q_D(t, k) <= ...
                 ac.Q_max(k)];
 
         % V_bus (3)
@@ -126,14 +123,16 @@ C = [C, W_f >= 0];
 % refbus constraint
 C = [C, W_f(k_ref, k_ref) == 0];
 
+Ysum = zeros_like(ac.Y_k(1));
+for k = ac.Gens'
+    Ysum = Ysum + ac.Y_k(k);
+end
+
+% sum Wm = 1
+C = [C, trace(Ysum * W_m) == -1];   
+
 % Nonnegativity constraints on reserve bounds
 C = [C, R_us >= 0, R_ds >= 0];
-end
-%% same as above 2 cells, but then in struct
-p = formulate('P3*');
-decision_vars = {W_f, W_m, R_us, R_ds};
-[Obj, C] = p.prepare(ac, wind, t, decision_vars);
-
 %% Optimize
 opt = sdpsettings('verbose', 0);
 diagnostics = optimize(C, Obj, opt);

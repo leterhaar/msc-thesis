@@ -8,26 +8,26 @@ addpath('../wind');
 %% initialize models
 
 % initialize network model
-dc = DC_model('case14');
-dc.set_WPG_bus(9);
+dc = DC_model('case_ieee30');
+dc.set_WPG_bus(22);
 
 % initialize wind model
 wind = wind_model(dc, 24, 0.2);
 
 % 
 epsilon = 5e-2;                         % violation parameter
-zeta = 5*dc.N_G;                    % Helly-dimsension
+zeta = 5*dc.N_G;                        % Helly-dimsension
 beta = 1e-5;                            % confidence parameter
 
 % determine number of scenarios to generate based on Eq (2-4)
 N = ceil(2/epsilon*(zeta-1+log(1/beta)));
-N = 100;
+% N = 100;
 % generate scenarios
 wind.generate(N);
 t_wind = 8;
 
 % divide scenarios and initialize agents
-N_agents = 10;
+N_agents = 14;
 assert(N >= N_agents, 'There cannot be more agents than scenarios');
 cut_index = ceil(linspace(1, N+1, N_agents+1));
 
@@ -36,7 +36,7 @@ dm = 2;
 G = random_graph(N_agents, dm, 'rand');
 % plot(digraph(G))
 %% create and init agents
-prg = progress('Initializing agents', N_agents);
+prg = progress('Initializing', N_agents);
 for i = 1:N_agents
     agents(i) = DC_agent(dc, wind, t_wind, cut_index(i), cut_index(i+1)-1); 
     prg.ping();
@@ -120,7 +120,7 @@ end
 feasible_for_all = 1;
 for i = 1:N_agents
     assign(x, xstar(:,i));
-    if all(check(C_all) < -1e-6)
+    if any(check(C_all) < -1e-6)
         feasible_for_all = 0;
     end
 end
