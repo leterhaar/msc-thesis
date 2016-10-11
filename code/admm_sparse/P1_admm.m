@@ -220,8 +220,7 @@ x_init = vec(blkdiag(Wf_init, Ws_init{:}));
 % create sparsity pattern of all data matrices
 sparsity = sum(abs(data_matrices),3) > 0;
 plot(graph(sparsity))
-sparsity(:, end) = 1;
-sparsity(end, :) = 1;
+
 
 % chordal extension??? graph is not yet chordal and also not connected...
 % HOW TO DO THIS?

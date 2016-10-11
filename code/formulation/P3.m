@@ -13,6 +13,8 @@ dock
 %% Load models
 ac = AC_model('case14');
 ac.set_WPG_bus(9);
+ac.c_us(3) = 5;
+
 figure(1);
 ac.draw_network();
 
@@ -23,7 +25,7 @@ wind = wind_model(ac, N_t, 0.2);
 N = 5;
 wind.dummy(N);
 % wind.use_forecast();
-wind.generate(N);
+% wind.generate(N);
 wind2 = copy(wind);
 %% Define problem
 
@@ -53,8 +55,8 @@ for j = 1:ac.N_G
 end
 
 % Reserve requirements
-lambda = 0.5;
-Obj = Obj + lambda*(ac.c_us' * R_us + ac.c_ds' * R_ds);         
+lambda = 1;
+Obj = Obj + lambda*(ac.c_us' * R_us + ac.c_us' * R_ds);         
 
 %% Define constraints
 C = [];
