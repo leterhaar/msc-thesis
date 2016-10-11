@@ -22,8 +22,8 @@ N_t = 24;
 wind = wind_model(ac, N_t, 0.2);
 
 % define sample complexity
-N = 5; 
-% wind.generate(N);
+N = 2; 
+wind.generate(N);
 % wind.use_forecast();
 wind.dummy(N);
 %% Define problem
@@ -54,7 +54,7 @@ for j = 1:ac.N_G
 end
 
 % Reserve requirements
-lambda = 0.5;
+lambda = 1;
 Obj = Obj + lambda*(ac.c_us' * R_us + ac.c_us' * R_ds);         
 
 %% Define constraints
@@ -128,6 +128,13 @@ C = [C, R_us >= 0, R_ds >= 0];
 
 % d_ds and d_us should always sum to 1
 C = [C, ones(1, ac.N_G)*d_us == 1, ones(1, ac.N_G)*d_ds == 1];
+Ysum = zeros_like(ac.Y_k(1));
+for k = ac.Gens'
+    Ysum = Ysum + ac.Y_k(k);
+end
+
+% sum Wm = 1
+C = [C, trace(Ysum * W_m) == -1];
 
 %% Optimize
 opt = sdpsettings('verbose', 0, 'debug', 1, 'solver', 'mosek');
