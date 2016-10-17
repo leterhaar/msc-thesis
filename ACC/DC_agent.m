@@ -57,8 +57,13 @@ classdef DC_agent < handle
             ag.Jtilde = -1e9;
             
             % store params of active constraints
-            ag.A{1} = ag.C_1_params(Ac(C_ineqs), :);
-
+            ag.A{1} = [];
+            x_star = value(ag.x);
+            for i = i_start:i_end
+                ag.A{1} = [ag.A{1};  ...
+                       DC_f_check(x_star, i, dc, wind, t_wind)];
+            end
+            
             % set t to 1
             ag.t = 1;
             
@@ -88,36 +93,70 @@ classdef DC_agent < handle
                 ag.L = [];
             else
 
-                % add own last active constraints and initial constraints
+                % add own initial constraints and last active constraints
                 ag.L = unique([ag.L; ag.C_1_params; ag.A{ag.t}], 'rows');
-
-                % build constraints from L
-                C_L = [];
+                
+                % check feasibility and activeness for all constraints
+                still_feasible = 1;
+                ag.A{ag.t + 1} = [];
+                x_star = value(ag.x);
                 for params = ag.L'
-                    
-                    % extract params
                     i = params(1);
                     j = params(2);
                     
-                    % add constraints to set C_L
-                    C_L = [C_L, ...
-                           DC_f_ineq(ag.x, i, ag.dc, ag.wind, ag.t_wind, j)];
+                    [params_act, residuals] = DC_f_check(x_star, i, ag.dc,...
+                                                ag.wind, ag.t_wind, j);
+                    
+                    % check for infeasibility
+                    if residuals < -1e-6 || isnan(residuals)
+                        still_feasible = 0;
+                        break;
+                    end
+                    
+                    % store the active constraints
+                    ag.A{ag.t + 1} = [ag.A{ag.t+1}; params_act];
                 end
                 
-                % check if current value for x is infeasible for the new 
-                % constraints
-                if any(check(C_L) < -1e-6) || any(isnan(check(C_L)))
+                % see if the solution is still feasible
+                if still_feasible
+                    
+                    % keep the objective value the same
+                    ag.J(ag.t + 1) = ag.J(ag.t);
+                    
+                else
+                    
+                    % build constraints from L
+                    C_L = [];
+                    for params = ag.L'
 
-                    % if infeasible with new constraints, optimize again
+                        % extract params
+                        i = params(1);
+                        j = params(2);
+
+                        % add constraints to set C_L
+                        C_L = [C_L, ...
+                               DC_f_ineq(ag.x, i, ag.dc, ag.wind, ag.t_wind, j)];
+                    end
+                
+                    % optimize again
                     opt = sdpsettings('verbose', 0);
                     optimize([ag.C_0, C_L], ag.Obj, opt);
+                    
+                    % update active constraints using the updated solution
+                    ag.A{ag.t + 1} = [];
+                    x_star = value(ag.x);
+                    for params = ag.L'
+                        i = params(1);
+                        j = params(2);
+                        ag.A{ag.t+1} = [ag.A{ag.t+1}; ...
+                                        DC_f_check(x_star, i, ag.dc, ...
+                                        ag.wind, ag.t_wind, j)];
+                    end
+                    
+                    % update J
+                    ag.J(ag.t + 1) = value(ag.Obj);
+                    
                 end                
-                
-                % update A
-                ag.A{ag.t + 1} = ag.L(Ac(C_L), :);
-
-                % update J
-                ag.J(ag.t + 1) = value(ag.Obj);
 
                 % update iteration number
                 ag.t = ag.t + 1;

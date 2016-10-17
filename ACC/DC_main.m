@@ -8,8 +8,8 @@ addpath('../wind');
 %% initialize models
 
 % initialize network model
-dc = DC_model('case14');
-dc.set_WPG_bus(9);
+dc = DC_model('case_ieee30');
+dc.set_WPG_bus(22);
 
 % initialize wind model
 wind = wind_model(dc, 24, 0.2);
@@ -20,19 +20,19 @@ zeta = 5*dc.N_G;                        % Helly-dimsension
 beta = 1e-5;                            % confidence parameter
 
 % determine number of scenarios to generate based on Eq (2-4)
-N = ceil(2/epsilon*(zeta-1+log(1/beta)));
-N = 50;
+% N = ceil(2/epsilon*(zeta-1+log(1/beta)));
+N = 100;
 % generate scenarios
-wind.dummy(N);
+wind.generate(N);
 t_wind = 8;
 
 % divide scenarios and initialize agents
-N_agents = 5;
+N_agents = 10;
 assert(N >= N_agents, 'There cannot be more agents than scenarios');
 cut_index = ceil(linspace(1, N+1, N_agents+1));
 
 % generate random connection graph with fixed diameter
-dm = 2;
+dm = 3;
 G = random_graph(N_agents, dm, 'rand');
 % plot(digraph(G))
 %% create and init agents
@@ -42,12 +42,12 @@ for i = 1:N_agents
     prg.ping();
 end
 %% 
-ngc = 1;
+ngc = ones(N_agents, 1);
 t = 1;
 infeasible = 0;
 
 % while not converged and still feasible
-while ngc < 2*dm+1 && not(infeasible) && t < 7
+while all(ngc < 2*dm+1) && not(infeasible)
     prg = progress(sprintf('Iteration %i',t), N_agents);
     
     % loop over agents
@@ -57,7 +57,7 @@ while ngc < 2*dm+1 && not(infeasible) && t < 7
         for j = find(G(:, i))';
             
             % add incoming A and J
-            agents(i).build(agents(j).A{t}, agents(j).J(t), agents(j).x(:,t));
+            agents(i).build(agents(j).A{t}, agents(j).J(t));
             
         end
             
@@ -73,9 +73,9 @@ while ngc < 2*dm+1 && not(infeasible) && t < 7
         
         % check if J(t+1) is J(t)
         if all_close(agents(i).J(t+1), agents(i).J(t), 1e-9)
-            ngc = ngc + 1;
+            ngc(i) = ngc(i) + 1;
         else
-            ngc = 1;
+            ngc(i) = 1;
         end
         
         prg.ping();
@@ -91,7 +91,7 @@ end
 xstar = zeros(5*dc.N_G, N_agents);
 Js = zeros(t, N_agents);
 for i = 1:N_agents
-    xstar(:, i) = value(agents(i).x_var);
+    xstar(:, i) = value(agents(i).x);
     Js(:, i) = [agents(i).J]';
 end
 
@@ -145,7 +145,7 @@ else
 end
         
 %% plot Js
-figure(1)
+figure(2)
 clf
 dock
 
@@ -153,9 +153,11 @@ hold on
 grid on
 xlabel('iteration')
 ylabel('J(x*)');
-title('Objective vs iterations');
+title('Objective vs iterations for ACC');
 plot(1:t, value(Obj)*ones(1,t), '-.', 'linewidth', 1.2);
 plot(Js, 'r-', 'linewidth', 1);
 set(gca, 'xtick', 1:t);
 legend('Centralized', 'Agents', 'location', 'se');
 
+
+klaarrr

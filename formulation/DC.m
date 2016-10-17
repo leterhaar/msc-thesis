@@ -13,20 +13,22 @@ dock
 dc = DC_model('case14');
 dc.set_WPG_bus(9);
 dc.draw_network();
+dc.c_us(4) = 5;
 
 epsilon = 5e-2;                         % violation parameter
-zeta = 5*dc.N_G;                    % Helly-dimsension
+zeta = 5*dc.N_G;                        % Helly-dimsension
 beta = 1e-5;                            % confidence parameter
 
 % determine number of scenarios to generate based on Eq (2-4)
-N = ceil(2/epsilon*(zeta-1+log(1/beta)));
-N = 100;
-wind = wind_model(dc, 24, 0.2);
-wind.generate(N);
-
+N_orig = ceil(2/epsilon*(zeta-1+log(1/beta)));
+wind_orig = wind_model(dc, 24, 0.2);
+wind_orig.generate(N_orig);
 %%
 t = 5;
-wind.plot(t);
+wind = copy(wind_orig);
+wind.use_extremes(t);
+N = 2;
+wind_orig.plot(t);
 
 P_G = sdpvar(dc.N_G, 1, 'full');       % real power production 
 R_us = sdpvar(dc.N_G, 1, 'full');      % upspinning reserve requirement
@@ -103,7 +105,7 @@ decision_vars = {P_G, R_us, R_ds, d_us, d_ds};
 % [Obj, Cons] = p.prepare(dc, wind, t, decision_vars);
 
 %% Optimize
-opt = sdpsettings('verbose', 1);
+opt = sdpsettings('verbose', 0);
 diagnostics = optimize(Cons, Obj, opt);
 
 %% Evaluate and show
@@ -142,5 +144,3 @@ if diagnostics.problem ~= 0
 else
     fprintf('%s\n\n',diagnostics.info);
 end
-
-p.evaluate(dc, wind, t, decided_vars);

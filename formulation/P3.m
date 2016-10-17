@@ -26,7 +26,7 @@ N = 5;
 wind.dummy(N);
 % wind.use_forecast();
 % wind.generate(N);
-wind2 = copy(wind);
+% wind2 = copy(wind);
 %% Define problem
 
 t = 17; % for now, do a loop over 24 hours later

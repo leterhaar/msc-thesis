@@ -21,13 +21,15 @@ N_t = 24;
 wind = wind_model(ac, N_t, 0.2);
 
 % define sample complexity
-N = 5; 
-% wind.generate(N);
+N = 100;
+wind.generate(N);
+wind2 = copy(wind);
 % wind.use_forecast();
-wind.dummy(N);
+% wind.dummy(N);
 %% Define problem
 t = 8; % for now, do a loop over 24 hours later
-
+wind.use_extremes(t);
+N = 2;
 W_f = sdpvar(2*ac.N_b); 
 % W_f is a symmetric real valued matrix
 W_s = sdpvar(2*ac.N_b, 2*ac.N_b, N);

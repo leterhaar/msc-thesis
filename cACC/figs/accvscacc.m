@@ -1,8 +1,11 @@
 %% quick and dirty plot to compare Js
+figure(3);
+set(gcf, 'name', 'ACC vs cACC');
 assert(exist('Js_acc', 'var') == 1, 'No acc results available');
 assert(exist('Js', 'var') == 1, 'No results available');
 assert(exist('Obj', 'var') == 1, 'No centralized result available');
 clf
+Jc = value(Obj);
 
 hold on
 grid on
