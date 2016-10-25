@@ -1,19 +1,25 @@
-function Obj = DC_f_obj(x, dc, wind, t_wind)
+function Obj = AC_f_obj(x, ac, wind, t)
 % returns the objective function
 
+    % extract  variables from x
+    W_f = x{1};
+    R = x{3};
+
     % define indexes for variables
-    PG_idx = 1:dc.N_G;
-    Rus_idx = dc.N_G+1:2*dc.N_G;
-    Rds_idx = 2*dc.N_G+1:3*dc.N_G;
+    Rus_idx = 1:ac.N_G;
+    Rds_idx = ac.N_G+1:2*ac.N_G;
     
     Obj = 0;
     lambda = 1;
 
     % add power generation costs
-    Obj = Obj + dc.c_li' * x(PG_idx) ...
-                        + x(PG_idx)' * diag(dc.c_qu) * x(PG_idx);
+    for j = 1:ac.N_G
+        k = ac.Gens(j);
+        Obj = Obj + ac.c_us(j)*(trace(ac.Y_k(k)*W_f) + ac.P_D(t,k) ...
+                                                -ac.C_w(k)*wind.P_wf(t));
+    end
 
     % add reserve requirements costs
-    Obj = Obj + lambda * (dc.c_us' * x(Rus_idx)  ...
-                       + dc.c_ds' * x(Rds_idx));
+    Obj = Obj + lambda * (ac.c_us' * R(Rus_idx)  ...
+                       + ac.c_ds' * R(Rds_idx));
 end

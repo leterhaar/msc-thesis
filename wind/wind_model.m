@@ -175,6 +175,11 @@ classdef wind_model < handle
         
         function s = slice(obj, i_start, i_end)
         %% returns a slice of the generated wind
+            if nargin < 3
+                tmp = i_start;
+                i_start = tmp(1);
+                i_end = tmp(2);
+            end
             s = struct( 'P_wf', obj.P_wf, ...
                         'P_w', obj.P_w(:, i_start:i_end), ...
                         'P_m', obj.P_m(:, i_start:i_end));

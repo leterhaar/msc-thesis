@@ -1,57 +1,42 @@
 %% DC ACC algorithm
 
 % add helper path
-addpath('../misc');
-addpath('../formulation');
-addpath('../wind');
+addpath('../experiment');
 
 %% initialize models
 
-% initialize network model
-dc = DC_model('case_ieee30');
-dc.set_WPG_bus(22);
+N = 6;
+m = 3;
 
-% initialize wind model
-wind = wind_model(dc, 24, 0.2);
+init_experiment(...
+    'model_name',           'case14',   ...
+    'model_formulation',    'P3',       ...
+    'wind_N',               N,         ...
+    'wind_Nm',              ceil(N/m));
 
-% 
-epsilon = 5e-2;                         % violation parameter
-zeta = 5*dc.N_G;                        % Helly-dimsension
-beta = 1e-5;                            % confidence parameter
-
-% determine number of scenarios to generate based on Eq (2-4)
-% N = ceil(2/epsilon*(zeta-1+log(1/beta)));
-N = 100;
-% generate scenarios
-wind.generate(N);
 t_wind = 8;
 
-% divide scenarios and initialize agents
-N_agents = 10;
-assert(N >= N_agents, 'There cannot be more agents than scenarios');
-cut_index = ceil(linspace(1, N+1, N_agents+1));
-
 % generate random connection graph with fixed diameter
-dm = 3;
-G = random_graph(N_agents, dm, 'rand');
+diam = 3;
+G = random_graph(m, diam, 'rand');
 % plot(digraph(G))
 %% create and init agents
-prg = progress('Initializing', N_agents);
-for i = 1:N_agents
-    agents(i) = DC_agent(dc, wind, t_wind, cut_index(i), cut_index(i+1)-1); 
+prg = progress('Initializing', m);
+for i = 1:m
+    agents(i) = AC_agent(ac, wind, t_wind, cut(i,1), cut(i,2)); 
     prg.ping();
 end
 %% 
-ngc = ones(N_agents, 1);
+ngc = ones(m, 1);
 t = 1;
 infeasible = 0;
 
 % while not converged and still feasible
-while all(ngc < 2*dm+1) && not(infeasible)
-    prg = progress(sprintf('Iteration %i',t), N_agents);
+while all(ngc < 2*diam+1) && not(infeasible)
+    prg = progress(sprintf('Iteration %i',t), m);
     
     % loop over agents
-    for i = 1:N_agents
+    for i = 1:m
         
         % loop over all incoming agents to agent i
         for j = find(G(:, i))';
@@ -88,40 +73,54 @@ end
 %% Validation 
 
 % store value for J and x for all agents
-xstar = zeros(5*dc.N_G, N_agents);
-Js = zeros(t, N_agents);
-for i = 1:N_agents
-    xstar(:, i) = value(agents(i).x);
+xstar_cell = cell(3, m);
+xstar = zeros(2*(2*ac.N_b)^2+2*ac.N_G, m);
+Js = zeros(t, m);
+for i = 1:m
+    xstar_cell(:, i) = values_cell(agents(i).x);
+    xstar(:,i) = [vec(xstar_cell{1, i}); vec(xstar_cell{2, i});  ...
+                                                xstar_cell{3, i}];
     Js(:, i) = [agents(i).J]';
 end
-
+%%
 all_agents_are_close = 1;
-for i = 1:N_agents-1
-    if not( all_close(xstar(:, i), xstar(:, i+1), 1e-4) )
+for j = 1:m-1
+    for i = j+1:m
+       if not( all_close(xstar(:, i), xstar(:, j), 1e-3) )
         all_agents_are_close = 0;
+        fprintf('Biggest diff between agent %i and %i: \t %g\n', i, j,...
+                                        max(abs(xstar(:,i)-xstar(:,j))));
+       end 
     end
 end
+
 if all_agents_are_close
     fprintf('\nAll agents are close\n');
 else
     fprintf('\n(!) Not all agents are close\n');
 end
-
+%%
 % check the solution against all constraints a posteriori
 tic
-x = sdpvar(5*dc.N_G, 1, 'full');
+x = {   sdpvar(2*ac.N_b), ...       Wf
+        sdpvar(2*ac.N_b), ...       Wm
+        sdpvar(2*ac.N_G, 1)}; ...   Rus and Rdssdpvar(5*dc.N_G, 1, 'full');
 
-C_all = DC_f_0(x, dc, wind, t_wind);
+C_all = AC_f_0(x, ac, wind, t_wind);
 
 for i = 1:N
-        C_all = [C_all, DC_f_ineq(x, i, dc, wind, t_wind)];
+        C_all = [C_all, AC_f_ineq(x, i, ac, wind, t_wind)];
 end
-
+%%
 feasible_for_all = 1;
-for i = 1:N_agents
-    assign(x, xstar(:,i));
-    if any(check(C_all) < -1e-6)
+for i = 1:m
+    assign_cell(x, xstar_cell(:,i));
+    residuals = check(C_all);
+    if any(residuals < -1e-3)
         feasible_for_all = 0;
+        fprintf('Min residual agent %i: \t %g\n', i, min(residuals));
+        check(C_all(residuals < -1e-3))
+        fprintf('\n\n');
     end
 end
 if feasible_for_all
@@ -129,16 +128,18 @@ if feasible_for_all
 else
     fprintf('(!) Some solution is infeasible for all original constraints\n');
 end
-
+%%
+tic
 % calculate central solution
-Obj = DC_f_obj(x, dc, wind, t_wind);
+Obj = AC_f_obj(x, ac, wind, t_wind);
 
 opt = sdpsettings('verbose', 0);
 optimize(C_all, Obj, opt);
-xstar_centralized = value(x);
+xstar_cell_c = values_cell(x);
+xstar_c = [vec(xstar_cell_c{1}); vec(xstar_cell_c{2}); xstar_cell_c{3}];
 toc
 
-if all_close(xstar(:,1), xstar_centralized, 1e-4)
+if all_close(xstar(:,1), xstar_c, 1e-4)
     fprintf('Decentralized and centralized solution are the same\n');
 else
     fprintf('Central solution is different\n');

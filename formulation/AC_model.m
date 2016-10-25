@@ -2,7 +2,7 @@
 % Class that constructs and stores all the values needed 
 % for the DC model 
 %
-% Usage: dcmodel = DC_model([modelname])
+% Usage: ac = AC_model([modelname])
 classdef AC_model < handle
     properties
         model_name;      % name of the model

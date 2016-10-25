@@ -51,7 +51,7 @@ Obj = 0;
 % P_G for every generator
 for j = 1:ac.N_G
     k = ac.Gens(j);
-    Obj = Obj + ac.c_us(j)*trace(ac.Y_k(k)*W_f);
+    Obj = Obj + ac.c_us(j)*(trace(ac.Y_k(k)*W_f)+ac.P_D(t,k));
 end
 
 % Reserve requirements
@@ -80,7 +80,7 @@ for k = 1:ac.N_b
         <= trace(ac.M_k(k)*W_f) <= ...
            ac.V_max(k)^2];
 end
-
+%%
 for i = 1:N
     
     W_s = W_f + W_m * wind.P_m(t, i);
@@ -196,4 +196,4 @@ decided_vars{2} = Wm_opt;
 
 % formulate a new problem to check against all PSD constraints
 p = formulate('P3');
-p.evaluate(ac, wind2, t, decided_vars);
+% p.evaluate(ac, wind2, t, decided_vars);

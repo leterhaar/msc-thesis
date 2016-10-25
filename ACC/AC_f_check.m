@@ -1,4 +1,4 @@
-function [params_act, residuals] = DC_f_check(x, i, dc, wind, t_wind, j_des)
+function [params_act, residuals] = AC_f_check(x, i, ac, wind, t, j_des)
 % [C; params] = DC_f_ineq(x, i, dc, wind, t_wind)
 % Function to check a constraint for some scenario for solution x
     
@@ -8,79 +8,107 @@ function [params_act, residuals] = DC_f_check(x, i, dc, wind, t_wind, j_des)
 
     tol = 1e-6;
 
-    PG_idx = 1:dc.N_G;
-    Rus_idx = dc.N_G+1:2*dc.N_G;
-    Rds_idx = 2*dc.N_G+1:3*dc.N_G;
-    dus_idx = 3*dc.N_G+1:4*dc.N_G;
-    dds_idx = 4*dc.N_G+1:5*dc.N_G;
+    % extract variables from x
+    W_f = x{1};
+    W_m = x{2};
+    R = x{3};
+    R_us = R(1:ac.N_G);
+    R_ds = R(ac.N_G+1:2*ac.N_G);
     
-    % define reserve power
-    R = x(dus_idx) * max(0, -wind.P_m(t_wind, i)) ...
-                    - x(dds_idx) * max(0, wind.P_m(t_wind, i));                
-                
-                
-    % define scenario power injection vector
-    P_injs = dc.C_G * (x(PG_idx) + R) ...
-              + dc.C_w * wind.P_w(t_wind, i) - dc.P_D(t_wind, :)';
-    N_j = 4*dc.N_G + 2*dc.N_l;
+    N_j = 6*ac.N_b + 2*ac.N_G + 1;
     
     % preallocate residuals and parameters
     params = zeros(N_j, 2);
     residuals = zeros(N_j, 1);
     
     j = 1;
-
-    for k = 1:dc.N_G   
-
-        % generator lower limit
-        if j_des == j || j_des == 0
-            residuals(j) = - dc.P_Gmin(k) + x(PG_idx(k)) + R(k);
-            params(j, :) = [i j];
+    
+    for k = 1:ac.N_b
+        
+        % P_inj lower (1')
+        if j == j_des || j_des == 0
+            residuals(j) = -ac.P_min(k) ...
+                + trace(ac.Y_k(k)*(W_f + W_m * wind.P_m(t, i))) ...
+                         + ac.P_D(t, k) - ac.C_w(k)*wind.P_w(t, i);
+            params(j,:) = [i j];
         end
-        j = j+1;
-
-        % generator upper limit
-        if j_des == j || j_des == 0
-            residuals(j) = - x(PG_idx(k)) - R(k) + dc.P_Gmax(k);
-            params(j, :) = [i j];
+        j = j + 1;
+        
+        % P_inj upper (1')
+        if j == j_des || j_des == 0
+            residuals(j) = -(trace(ac.Y_k(k)*(W_f + W_m * wind.P_m(t, i))) ...
+                         + ac.P_D(t, k) - ac.C_w(k)*wind.P_w(t, i)) + ...
+                   ac.P_max(k);
+            params(j,:) = [i j];
         end
-        j = j+1;    
+        j = j + 1;
 
-        % R lower bound
-        if j_des == j || j_des == 0
-            residuals(j) = x(Rds_idx(k)) + R(k);
-            params(j, :) = [i j];
+        % Q_inj lower (2')
+        if j == j_des || j_des == 0
+            residuals(j) = -ac.Q_min(k) ...
+                 + trace(ac.Ybar_k(k)*(W_f + W_m * wind.P_m(t, i))) ...
+                            + ac.Q_D(t, k);
+            params(j,:) = [i j];
         end
-        j = j+1;   
+        j = j + 1;
+        
+        % Q_inj upper (2')
+        if j == j_des || j_des == 0
+            residuals(j) = -(trace(ac.Ybar_k(k)*(W_f + W_m * wind.P_m(t, i))) ...
+                            + ac.Q_D(t, k)) + ac.Q_max(k);
+            params(j,:) = [i j];
+        end
+        j = j + 1;
 
-        % R upper bound
-        if j_des == j || j_des == 0
-            residuals(j) = - R(k) + x(Rus_idx(k));
-            params(j, :) = [i j];
+
+        % V_bus lower (3')
+        if j == j_des || j_des == 0
+            residuals(j) = -ac.V_min(k)^2 ...
+                 + trace(ac.M_k(k)*(W_f + W_m * wind.P_m(t, i)));
+            params(j,:) = [i j];
         end
-        j = j+1;   
+        j = j + 1;   
+        
+        % V_bus upper (3')
+        if j == j_des || j_des == 0
+            residuals(j) = -trace(ac.M_k(k)*(W_f+W_m*wind.P_m(t, i))) + ...
+                    ac.V_max(k)^2;
+            params(j,:) = [i j];
+        end
+        j = j + 1;   
 
     end
-    
-    P_fs = dc.B_f * [dc.B_bustildeinv * P_injs(1:end-1); 0];
-    
-    for k = 1:dc.N_l
         
-        % line flow lower limit
-        if j_des == j || j_des == 0
-            residuals(j) = dc.P_fmax(k) + P_fs(k);
-            params(j, :) = [i j];
+
+    for g = 1:ac.N_G
+
+        % bus index
+        k = ac.Gens(g);
+
+        % Lower bound R between R_us and R_ds
+        if j == j_des || j_des == 0
+            residuals(j) = R_ds(g) ...
+                 + trace(ac.Y_k(k)*(W_m*wind.P_m(t, i))) ...
+                                    - ac.C_w(k)*wind.P_m(t, i);
+            params(j,:) = [i j];
         end
-        j = j+1;   
+        j = j + 1;
         
-        % line flow lower limit
-        if j_des == j || j_des == 0
-            residuals(j) = - P_fs(k) + dc.P_fmax(k);
-            params(j, :) = [i j];
+        % Lower bound R between R_us and R_ds
+        if j == j_des || j_des == 0
+            residuals(j) = -(trace(ac.Y_k(k)*(W_m*wind.P_m(t, i))) ...
+                                    - ac.C_w(k)*wind.P_m(t, i)) + R_us(g);
+            params(j,:) = [i j];
         end
-        j = j+1;   
+        j = j + 1;
         
     end
+    
+    if j == j_des || j_des == 0
+        residuals(j) = min(eig(W_f + W_m * wind.P_m(t, i)));
+        params(j,:) = [i j];
+    end
+    
     if j_des == 0
         params_act = params((residuals < tol) & (residuals > -tol), :);
     else

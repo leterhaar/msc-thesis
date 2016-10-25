@@ -3,7 +3,7 @@ classdef AC_agent < handle
     
     properties
         Obj;            % objective function
-        dc;             % dc model
+        ac;             % ac model
         wind;           % wind realizations
         C_0;            % set of initial deterministic constraints
         C_1_params;     % array with params of initial constraints
@@ -18,17 +18,19 @@ classdef AC_agent < handle
     
     methods
         
-        function ag = AC_agent(dc, wind, t_wind, i_start, i_end)
+        function ag = AC_agent(ac, wind, t_wind, i_start, i_end)
         % creates constraint set and objective function
             
             % INITIALIZE SDPVARS
-            ag.x = sdpvar(5*dc.N_G, 1, 'full'); % P_G Rus Rds dus dds
+            ag.x = {    sdpvar(2*ac.N_b), ...       Wf
+                        sdpvar(2*ac.N_b), ...       Wm
+                        sdpvar(2*ac.N_G, 1)}; ...   Rus and Rds
             
             % create objective function
-            ag.Obj = DC_f_obj(ag.x, dc, wind, t_wind);
+            ag.Obj = AC_f_obj(ag.x, ac, wind, t_wind);
 
             % create deterministic constraints
-            ag.C_0 = DC_f_0(ag.x, dc, wind, t_wind);
+            ag.C_0 = AC_f_0(ag.x, ac, wind, t_wind);
             
             % loop over scenarios to create scenario constraints
             C_ineqs = [];
@@ -36,7 +38,7 @@ classdef AC_agent < handle
             
             for i = i_start:i_end                    
                 % inequality constraints
-                [C_ineq, C_params] = DC_f_ineq(ag.x, i, dc, wind, t_wind);
+                [C_ineq, C_params] = AC_f_ineq(ag.x, i, ac, wind, t_wind);
                 C_ineqs = [C_ineqs, C_ineq];
                 
                 % store params to inequality constraints
@@ -45,7 +47,7 @@ classdef AC_agent < handle
             end
             
             ag.wind = wind;
-            ag.dc = dc;
+            ag.ac = ac;
             ag.t_wind = t_wind;
         
             % optimize
@@ -58,10 +60,10 @@ classdef AC_agent < handle
             
             % store params of active constraints
             ag.A{1} = [];
-            x_star = value(ag.x);
+            x_star = values_cell(ag.x);
             for i = i_start:i_end
                 ag.A{1} = [ag.A{1};  ...
-                       DC_f_check(x_star, i, dc, wind, t_wind)];
+                       AC_f_check(x_star, i, ac, wind, t_wind)];
             end
             
             % set t to 1
@@ -99,12 +101,12 @@ classdef AC_agent < handle
                 % check feasibility and activeness for all constraints
                 still_feasible = 1;
                 ag.A{ag.t + 1} = [];
-                x_star = value(ag.x);
+                x_star = values_cell(ag.x);
                 for params = ag.L'
                     i = params(1);
                     j = params(2);
                     
-                    [params_act, residuals] = DC_f_check(x_star, i, ag.dc,...
+                    [params_act, residuals] = AC_f_check(x_star, i, ag.ac,...
                                                 ag.wind, ag.t_wind, j);
                     
                     % check for infeasibility
@@ -135,7 +137,7 @@ classdef AC_agent < handle
 
                         % add constraints to set C_L
                         C_L = [C_L, ...
-                               DC_f_ineq(ag.x, i, ag.dc, ag.wind, ag.t_wind, j)];
+                               AC_f_ineq(ag.x, i, ag.ac, ag.wind, ag.t_wind, j)];
                     end
                 
                     % optimize again
@@ -149,7 +151,7 @@ classdef AC_agent < handle
                         i = params(1);
                         j = params(2);
                         ag.A{ag.t+1} = [ag.A{ag.t+1}; ...
-                                        DC_f_check(x_star, i, ag.dc, ...
+                                        AC_f_check(x_star, i, ag.ac, ...
                                         ag.wind, ag.t_wind, j)];
                     end
                     

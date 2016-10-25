@@ -1,1 +1,0 @@
-function all_close
