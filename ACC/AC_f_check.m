@@ -1,6 +1,9 @@
 function [params_act, residuals] = AC_f_check(x, i, ac, wind, t, j_des)
-% [C; params] = DC_f_ineq(x, i, dc, wind, t_wind)
-% Function to check a constraint for some scenario for solution x
+% [params, residuals] = AC_f_ineq(x, i, ac, wind, t_wind, [j_des])
+% Function to check a constraint j_des for some scenario i for solution x
+% j_des can also be left out, then all constraints for scenario i will
+% be checked
+% returns the parameters of the active constraints and all the residuals
     
     if nargin < 6
         j_des = 0;

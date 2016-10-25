@@ -5,19 +5,19 @@ addpath('../experiment');
 
 %% initialize models
 
-N = 6;
-m = 3;
+N = 100;
+Nm = 20;
 
 init_experiment(...
     'model_name',           'case14',   ...
     'model_formulation',    'P3',       ...
     'wind_N',               N,         ...
-    'wind_Nm',              ceil(N/m));
+    'wind_Nm',              Nm);
 
 t_wind = 8;
 
 % generate random connection graph with fixed diameter
-diam = 3;
+diam = 2;
 G = random_graph(m, diam, 'rand');
 % plot(digraph(G))
 %% create and init agents
@@ -82,13 +82,14 @@ for i = 1:m
                                                 xstar_cell{3, i}];
     Js(:, i) = [agents(i).J]';
 end
-%%
+
+% compare agent solutions
 all_agents_are_close = 1;
 for j = 1:m-1
     for i = j+1:m
        if not( all_close(xstar(:, i), xstar(:, j), 1e-3) )
         all_agents_are_close = 0;
-        fprintf('Biggest diff between agent %i and %i: \t %g\n', i, j,...
+        fprintf('Biggest diff between x agent %i and %i: \t %g\n', i, j,...
                                         max(abs(xstar(:,i)-xstar(:,j))));
        end 
     end
@@ -99,6 +100,33 @@ if all_agents_are_close
 else
     fprintf('\n(!) Not all agents are close\n');
 end
+
+% extract and compare V vectors 
+
+% preallocate voltage vector
+Xs = zeros(2*ac.N_b, m);
+
+% preallocate mismatch voltage vector
+Xms = zeros_like(Xs);
+
+% loop over agents and extract
+for i = 1:m
+    W = xstar_cell{1,i};
+    Wm = xstar_cell{2,i};
+    Xs(:, i) = sqrt(diag(W)) .* sign(W(:,1));
+    Xms(:, i) = sqrt(diag(Wm)) .* sign(Wm(:,1));
+end
+
+for i = 1:m-1
+    for j = i+1:m
+       if not( all_close(Xs(:, i), Xs(:, j), 1e-3) )
+        all_agents_are_close = 0;
+        fprintf('Biggest diff between V agent %i and %i: \t %g\n', i, j,...
+                                        max(abs(Xs(:,i)-Xs(:,j))));
+       end 
+    end
+end
+
 %%
 % check the solution against all constraints a posteriori
 tic
@@ -114,12 +142,17 @@ end
 %%
 feasible_for_all = 1;
 for i = 1:m
-    assign_cell(x, xstar_cell(:,i));
-    residuals = check(C_all);
+    N_j = 6*ac.N_b + 2*ac.N_G + 1;
+    residuals = zeros(N*N_j,1);
+    for j = 1:N
+        offset = (j-1)*N_j;
+        [~, residuals(offset+1:offset+N_j)] = ...
+                        AC_f_check(xstar_cell(:, i), i, ac, wind, t_wind);
+    end
     if any(residuals < -1e-3)
         feasible_for_all = 0;
         fprintf('Min residual agent %i: \t %g\n', i, min(residuals));
-        check(C_all(residuals < -1e-3))
+        C_all(residuals < -1e-3)
         fprintf('\n\n');
     end
 end
@@ -130,7 +163,7 @@ else
 end
 %%
 tic
-% calculate central solution
+% calculate centralized solution
 Obj = AC_f_obj(x, ac, wind, t_wind);
 
 opt = sdpsettings('verbose', 0);
@@ -138,14 +171,25 @@ optimize(C_all, Obj, opt);
 xstar_cell_c = values_cell(x);
 xstar_c = [vec(xstar_cell_c{1}); vec(xstar_cell_c{2}); xstar_cell_c{3}];
 toc
+%%
+% compare all solutions to the centralized solution
+agreement = true;
+for i = 1:m
+    if not(all_close(xstar(:,i), xstar_c, 1e-3))
+        fprintf('Central solution is different, max diff: \t %g \n', ...
+                        max(abs(xstar_c-xstar(:,i))));
+        agreement = false;
+    end
+end
 
-if all_close(xstar(:,1), xstar_c, 1e-4)
+if agreement
     fprintf('Decentralized and centralized solution are the same\n');
 else
-    fprintf('Central solution is different\n');
+    fprintf('(!) Centralized solution is different\n');
 end
-        
-%% plot Js
+%%
+
+% plot Js
 figure(2)
 clf
 dock
@@ -160,5 +204,5 @@ plot(Js, 'r-', 'linewidth', 1);
 set(gca, 'xtick', 1:t);
 legend('Centralized', 'Agents', 'location', 'se');
 
-
+figure(2)
 klaarrr
