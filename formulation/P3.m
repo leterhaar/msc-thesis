@@ -15,14 +15,15 @@ ac = AC_model('case14');
 ac.set_WPG_bus(9);
 ac.c_us(3) = 5;
 
+
 figure(1);
 ac.draw_network();
 
 N_t = 24;
-wind = wind_model(ac, N_t, 0.2);
+wind = wind_model(ac, N_t, 0.8);
 
 % define sample complexity 
-N = 5;
+N = 20;
 wind.dummy(N);
 % wind.use_forecast();
 % wind.generate(N);
@@ -30,8 +31,8 @@ wind.dummy(N);
 %% Define problem
 
 t = 17; % for now, do a loop over 24 hours later
-wind.use_extremes(t);
-N = 2;
+% wind.use_extremes(t);
+% N = 2;
 W_f = sdpvar(2*ac.N_b); 
 % W_f is a symmetric real valued matrix
 W_m = sdpvar(2*ac.N_b);
@@ -161,8 +162,8 @@ for j = 1:ac.N_G
 end
 
 % normalize such that sum(d) = 1
-dus_opt = normV(d);
-dds_opt = normV(d); % downspinning = upspinning in this formulation
+dus_opt = d;
+dds_opt = d; % downspinning = upspinning in this formulation
 
 % create scenario W_s for every mismatch
 Ws_opt = zeros(2*ac.N_b, 2*ac.N_b, N);
@@ -191,9 +192,3 @@ if diagnostics.problem ~= 0
 else
     fprintf('%s \t\tin %g seconds\n\n',diagnostics.info, diagnostics.solvertime);
 end
-
-decided_vars{2} = Wm_opt;
-
-% formulate a new problem to check against all PSD constraints
-p = formulate('P3');
-% p.evaluate(ac, wind2, t, decided_vars);

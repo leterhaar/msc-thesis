@@ -15,12 +15,13 @@ ac = AC_model('case14');
 ac.set_WPG_bus(9);
 figure(1);
 ac.draw_network();
+ac.c_us(3) = 5;
 
 N_t = 24;
-wind = wind_model(ac, N_t, 0.2);
+wind = wind_model(ac, N_t, 0.8);
 
 % define sample complexity 
-N = 5;
+N = 20;
 % wind.dummy(N);
 % wind.use_forecast();
 wind.dummy(N);
@@ -45,7 +46,6 @@ pause(0.001); % to show plot
 Obj = 0;
 
 % P_G for every generator
-lambda = 0.1;
 P_mmax = max([wind.P_m(t,:) 0]);
 P_mmin = min([wind.P_m(t,:) 0]);
 for j = 1:ac.N_G
