@@ -31,7 +31,8 @@ function init_experiment(varargin)
         struct( 'N',                        100, ...
                 'Nm',                       10, ...
                 'horizon',                  24, ...
-                'penetration',              0.2), ...
+                'penetration',              0.2, ...
+                'dummy',                    false), ...
         'algorithm',                'ACC');
 
     def_fields = fieldnames(exp);
@@ -83,7 +84,11 @@ function init_experiment(varargin)
     exp.model.network = model;
     
     wind = wind_model(model, exp.wind.horizon, exp.wind.penetration);
-    wind.generate(exp.wind.N);
+    if exp.wind.dummy
+        wind.dummy(exp.wind.N);
+    else
+        wind.generate(exp.wind.N);
+    end
     assignin('base', 'wind', wind);
     exp.wind.model = wind;
     

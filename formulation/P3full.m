@@ -1,41 +1,20 @@
 %% AC OPF
 % OtH 6-9-16
-addpath('../misc');
-addpath('../wind');
-
-figure(1);
-set(1, 'name', 'Network');
-dock
-
-figure(2);
-set(2, 'name', 'Wind');
-dock
-%% Load models
-ac = AC_model('case14');
-ac.set_WPG_bus(9);
-% ac.c_us(3) = 5;
-
-
-figure(1);
-ac.draw_network();
-
-N_t = 24;
-wind = wind_model(ac, N_t, 0.8);
-
-% define sample complexity 
-N = 10;
-% wind.dummy(N);
-% wind.use_forecast();
-wind.generate(N);
-% wind2 = copy(wind);
+init_experiment( ...
+    'model_name',       'case14', ...
+    'model_formulation','P3full', ...
+    'model_windbus',    9);
+wind2 = copy(wind);
+wind.use_extremes(t);
+N = 2;
 %% Define problem
 
 t = 17; % for now, do a loop over 24 hours later
-% wind.use_extremes(t);
-% N = 2;
+
 W_f = sdpvar(2*ac.N_b); 
 % W_f is a symmetric real valued matrix
-W_m = sdpvar(2*ac.N_b);
+W_mus = sdpvar(2*ac.N_b);
+W_mds = sdpvar(2*ac.N_b);
 % W_m is a symmetric real valued matrix
 
 % maximum up and downspinning vectors
@@ -57,7 +36,7 @@ end
 
 % Reserve requirements
 lambda = 1;
-Obj = Obj + lambda*(ac.c_us' * R_us + ac.c_us' * R_ds);         
+Obj = Obj + lambda*(ac.c_us' * R_us + ac.c_ds' * R_ds);         
 
 %% Define constraints
 C = [];
@@ -84,8 +63,11 @@ end
 %%
 for i = 1:N
     
-    W_s = W_f + W_m * wind.P_m(t, i);
-        
+    W_s = W_f + W_mus * max(0, -wind.P_m(t, i)) ...
+              - W_mds * max(0, wind.P_m(t,i));
+          
+          
+            
     for k = 1:ac.N_b
         % P_inj (1)
         C = [C, ac.P_min(k) ...
@@ -111,12 +93,12 @@ for i = 1:N
 
         % Bound R between R_us and R_ds
         C = [C, -R_ds(j) ...
-             <= trace(ac.Y_k(k)*(W_m*wind.P_m(t, i))) - ac.C_w(k)*wind.P_m(t, i) <= ...
+             <= trace(ac.Y_k(k)*(W_s-W_f)) - ac.C_w(k)*wind.P_m(t, i) <= ...
                 R_us(j)];
     end
     
     C = [C, W_s >= 0];
-    C = [C, W_s(k_ref, k_ref) == 0];
+    
 
 end
 
@@ -125,6 +107,8 @@ C = [C, W_f >= 0];
 
 % refbus constraint
 C = [C, W_f(k_ref, k_ref) == 0];
+C = [C, W_mus(k_ref, k_ref) == 0];
+C = [C, W_mds(k_ref, k_ref) == 0];
 
 Ysum = zeros_like(ac.Y_k(1));
 for k = ac.Gens'
@@ -132,7 +116,8 @@ for k = ac.Gens'
 end
 
 % sum Wm = 1
-C = [C, trace(Ysum * W_m) == -1];   
+C = [C, trace(Ysum * W_mus) == 1];   
+C = [C, trace(Ysum * W_mds) == 1];
 
 % Nonnegativity constraints on reserve bounds
 C = [C, R_us >= 0, R_ds >= 0];
@@ -141,54 +126,45 @@ opt = sdpsettings('verbose', 0);
 diagnostics = optimize(C, Obj, opt);
 
 %% Evaluate
+
 Wf_opt = value(W_f);
-Wm_opt = value(W_m);
+Wmus_opt = zero_for_nan(value(W_mus));
+Wmds_opt = zero_for_nan(value(W_mds));
 
 Rus_opt = value(R_us);
 Rds_opt = value(R_ds); 
 
-% if no W_m is required, replace NaN with zeros
-if all(all(isnan(Wm_opt)))
-   Wm_opt = zeros(2*ac.N_b);
-end
-
 % extract d from W_m by simulating P_m = -1
-d = zeros(ac.N_G, 1);
+dus_opt = zeros(ac.N_G, 1);
+dds_opt = zeros_like(dus_opt);
 for j = 1:ac.N_G
     k = ac.Gens(j);
-    d(j) = trace(ac.Y_k(k)*-Wm_opt) + ac.C_w(k);
-    Rds_opt(j) = -trace(ac.Y_k(k)*Wm_opt*max([wind.P_m(t,:) 0]));
-    Rus_opt(j) = trace(ac.Y_k(k)*Wm_opt*min([wind.P_m(t,:) 0]));
+    dus_opt(j) = trace(ac.Y_k(k)*Wmus_opt) + ac.C_w(k);
+    dds_opt(j) = trace(ac.Y_k(k)*Wmds_opt) + ac.C_w(k);
 end
 
-% normalize such that sum(d) = 1
-dus_opt = d;
-dds_opt = d; % downspinning = upspinning in this formulation
-
-% create scenario W_s for every mismatch
+% create scenario W_s and R for every scenario
 Ws_opt = zeros(2*ac.N_b, 2*ac.N_b, N);
+R = zeros(ac.N_G, N);
 for i = 1:N
-   Ws_opt(:,:,i) = Wf_opt + Wm_opt * wind.P_m(t,i);
+    Ws_opt(:,:,i) = Wf_opt + Wmus_opt * max(0, -wind.P_m(t, i)) ...
+                          - Wmds_opt * max(0, wind.P_m(t,i));
+    for j = 1:ac.N_G
+        k = ac.Gens(j);
+        R(j, i) = trace(ac.Y_k(k) * (Ws_opt(:,:,i)-Wf_opt)) ...
+                                        - ac.C_w(k)*wind.P_m(t, i);
+    end
 end
 
 decided_vars = {Wf_opt, Ws_opt, Rus_opt, Rds_opt, dus_opt, dds_opt};
-
-% calculate R for every scenario
-R = zeros(ac.N_G, N);
-% R2 = zeros(ac.N_G, N);
-for i = 1:N
-    for j = 1:ac.N_G
-        k = ac.Gens(j);
-%         R2(j, i) = trace(ac.Y_k(k) * (Ws_opt(:,:,i)-Wf_opt)) - ac.C_w(k)*wind.P_m(t, i);
-        R(j, i) = trace(ac.Y_k(k) * (Wm_opt * wind.P_m(t,i))) - ac.C_w(k)*wind.P_m(t, i);
-    end
-end
 
 % output ranks and table with results
 format_result(ac, wind, t, decided_vars, R);
 
 if diagnostics.problem ~= 0
-    fprintf('%s (!) \t\t in %g seconds\n\n', diagnostics.info, diagnostics.solvertime);
+    fprintf('%s (!) \t\t in %g seconds\n\n',  ...
+                            diagnostics.info, diagnostics.solvertime);
 else
-    fprintf('%s \t\tin %g seconds\n\n',diagnostics.info, diagnostics.solvertime);
+    fprintf('%s \t\tin %g seconds\n\n', ...
+                            diagnostics.info, diagnostics.solvertime);
 end

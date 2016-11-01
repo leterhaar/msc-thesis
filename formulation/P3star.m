@@ -11,8 +11,8 @@ figure(2);
 set(2, 'name', 'Wind');
 dock
 %% Load models
-ac = AC_model('case_ieee30');
-ac.set_WPG_bus(22);
+ac = AC_model('case14');
+ac.set_WPG_bus(9);
 % ac.c_us(3) = 5;
 
 
@@ -23,14 +23,13 @@ N_t = 24;
 wind = wind_model(ac, N_t, 0.8);
 
 % define sample complexity 
-N = 1000;
+N = 10;
 wind.generate(N);
-wind2 = copy(wind);
+% wind2 = copy(wind);
 %% Define problem
 
 t = 17; % for now, do a loop over 24 hours later
-wind.use_extremes(t);
-N = 2;
+
 W_f = sdpvar(2*ac.N_b); 
 % W_f is a symmetric real valued matrix
 W_mus = sdpvar(2*ac.N_b);
@@ -124,6 +123,8 @@ end
 
 % PSD constraint on W_f 
 C = [C, W_f >= 0];
+% C = [C, W_mus >= 0];
+% C = [C, W_mds >= 0];
 
 % refbus constraint
 C = [C, W_f(k_ref, k_ref) == 0];
@@ -146,23 +147,14 @@ opt = sdpsettings('verbose', 0);
 diagnostics = optimize(C, Obj, opt);
 
 %% Evaluate
-N = 1000;
-wind = wind2;
+% N = 1000;
+% wind = wind2;
 Wf_opt = value(W_f);
-Wmus_opt = value(W_mus);
-Wmds_opt = value(W_mds);
+Wmus_opt = zero_for_nan(value(W_mus));
+Wmds_opt = zero_for_nan(value(W_mds));
 
 Rus_opt = value(R_us);
 Rds_opt = value(R_ds); 
-
-% if no W_m is required, replace NaN with zeros
-if any(any(isnan(Wmus_opt)))
-    Wmus_opt = zeros(2*ac.N_b);
-end
-
-if any(any(isnan(Wmds_opt)))
-    Wmds_opt = zeros(2*ac.N_b);
-end
 
 % extract d from W_m by simulating P_m = -1
 dus_opt = zeros(ac.N_G, 1);
@@ -171,24 +163,14 @@ for j = 1:ac.N_G
     k = ac.Gens(j);
     dus_opt(j) = trace(ac.Y_k(k)*Wmus_opt) + ac.C_w(k);
     dds_opt(j) = trace(ac.Y_k(k)*Wmds_opt) + ac.C_w(k);
-    Rds_opt(j) = -trace(ac.Y_k(k)*Wmus_opt*max([wind.P_m(t,:) 0]));
-    Rus_opt(j) = trace(ac.Y_k(k)*Wmds_opt*max([-wind.P_m(t,:) 0]));
 end
 
-
-% create scenario W_s for every mismatch
+% create scenario W_s and R for every scenario
 Ws_opt = zeros(2*ac.N_b, 2*ac.N_b, N);
-for i = 1:N
-   Ws_opt(:,:,i) = Wf_opt + Wmus_opt * max(0, -wind.P_m(t, i)) ...
-                          - Wmds_opt * max(0, wind.P_m(t,i));
-end
-
-decided_vars = {Wf_opt, Ws_opt, Rus_opt, Rds_opt, dus_opt, dds_opt};
-
-% calculate R for every scenario
 R = zeros(ac.N_G, N);
-% R2 = zeros(ac.N_G, N);
 for i = 1:N
+    Ws_opt(:,:,i) = Wf_opt + Wmus_opt * max(0, -wind.P_m(t, i)) ...
+                          - Wmds_opt * max(0, wind.P_m(t,i));
     for j = 1:ac.N_G
         k = ac.Gens(j);
         R(j, i) = trace(ac.Y_k(k) * (Ws_opt(:,:,i)-Wf_opt)) ...
@@ -196,11 +178,15 @@ for i = 1:N
     end
 end
 
+decided_vars = {Wf_opt, Ws_opt, Rus_opt, Rds_opt, dus_opt, dds_opt};
+
 % output ranks and table with results
 format_result(ac, wind, t, decided_vars, R);
 
 if diagnostics.problem ~= 0
-    fprintf('%s (!) \t\t in %g seconds\n\n', diagnostics.info, diagnostics.solvertime);
+    fprintf('%s (!) \t\t in %g seconds\n\n',  ...
+                            diagnostics.info, diagnostics.solvertime);
 else
-    fprintf('%s \t\tin %g seconds\n\n',diagnostics.info, diagnostics.solvertime);
+    fprintf('%s \t\tin %g seconds\n\n', ...
+                            diagnostics.info, diagnostics.solvertime);
 end

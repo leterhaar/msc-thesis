@@ -11,14 +11,14 @@ figure(2);
 set(2, 'name', 'Wind');
 dock
 %% Load models
-ac = AC_model('case_ieee30');
-ac.set_WPG_bus(22);
-% ac.c_us(3) = 5;
+ac = AC_model('case14');
+ac.set_WPG_bus(9);
+
 figure(1);
 ac.draw_network();
 
 N_t = 24;
-wind = wind_model(ac, N_t, 0.8);
+wind = wind_model(ac, N_t, 0.2);
 
 % define sample complexity
 N = 20;
@@ -27,8 +27,7 @@ wind.dummy(N);
 % wind.dummy(N);
 %% Define problem
 t = 17; % for now, do a loop over 24 hours later
-% wind.use_extremes(t);
-% N = 2;
+
 W_f = sdpvar(2*ac.N_b); 
 % W_f is a symmetric real valued matrix
 W_s = sdpvar(2*ac.N_b, 2*ac.N_b, N);
