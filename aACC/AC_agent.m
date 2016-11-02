@@ -1,36 +1,36 @@
 
-classdef DC_agent < handle
+classdef AC_agent < handle
     
     properties
         Obj;            % objective function
-        dc;             % dc model
+        ac;             % ac model
         wind;           % wind realizations
         C_0;            % set of initial deterministic constraints
         C_1_params;     % array with params of initial constraints
         A;              % array with params of active constraints
         L;              % set of constraints for the next iteration
         J;              % value of the objective function
-        Jtilde;         % max_var of neigbouring objectives
-        x_var;          % sdpvars of the decision variable
-        x;              % matrix with values of x at each iteration on cols
-        z;              % matrix with all incoming x`s on cols
+        Jtilde;         % max of neigbouring objectives
+        x;              % sdpvars of the decision variable
         t;              % iteration number
         t_wind;         % wind time step
     end
     
     methods
         
-        function ag = DC_agent(dc, wind, t_wind, i_start, i_end)
+        function ag = AC_agent(ac, wind, t_wind, i_start, i_end)
         % creates constraint set and objective function
             
             % INITIALIZE SDPVARS
-            ag.x_var = sdpvar(5*dc.N_G, 1, 'full'); % P_G Rus Rds dus dds
+            ag.x = {    sdpvar(2*ac.N_b), ...       Wf
+                        sdpvar(2*ac.N_b), ...       Wm
+                        sdpvar(2*ac.N_G, 1)}; ...   Rus and Rds
             
             % create objective function
-            ag.Obj = DC_f_obj(ag.x_var, dc, wind, t_wind);
+            ag.Obj = AC_f_obj(ag.x, ac, wind, t_wind);
 
             % create deterministic constraints
-            ag.C_0 = DC_f_0(ag.x_var, dc, wind, t_wind);
+            ag.C_0 = AC_f_0(ag.x, ac, wind, t_wind);
             
             % loop over scenarios to create scenario constraints
             C_ineqs = [];
@@ -38,8 +38,7 @@ classdef DC_agent < handle
             
             for i = i_start:i_end                    
                 % inequality constraints
-                [C_ineq, C_params] = DC_f_ineq(ag.x_var, i, dc, ... 
-                                                            wind, t_wind);
+                [C_ineq, C_params] = AC_f_ineq(ag.x, i, ac, wind, t_wind);
                 C_ineqs = [C_ineqs, C_ineq];
                 
                 % store params to inequality constraints
@@ -48,7 +47,7 @@ classdef DC_agent < handle
             end
             
             ag.wind = wind;
-            ag.dc = dc;
+            ag.ac = ac;
             ag.t_wind = t_wind;
         
             % optimize
@@ -57,17 +56,16 @@ classdef DC_agent < handle
 
             % store value of objective function
             ag.J(1) = value(ag.Obj);
-            ag.x(:, 1) = value(ag.x_var);
             ag.Jtilde = -1e9;
             
             % store params of active constraints
             ag.A{1} = [];
-            x_star = value(ag.x_var);
+            x_star = values_cell(ag.x);
             for i = i_start:i_end
                 ag.A{1} = [ag.A{1};  ...
-                       DC_f_check(x_star, i, dc, wind, t_wind)];
+                       AC_f_check(x_star, i, ac, wind, t_wind)];
             end
-
+            
             % set t to 1
             ag.t = 1;
             
@@ -76,7 +74,7 @@ classdef DC_agent < handle
 
         end
         
-        function build(ag, A_incoming, J_incoming, x_incoming)
+        function build(ag, A_incoming, J_incoming)
         % builds L(t+1) and tilde J(t+1) agent by agent
             
             % add incoming A to the L(t+1)
@@ -84,9 +82,6 @@ classdef DC_agent < handle
             
             % take maximum of current J(t+1) and incoming J
             ag.Jtilde = max(ag.Jtilde, J_incoming);
-            
-            % add the incoming values of x to z
-            ag.z = [ag.z x_incoming];
         
         end
         
@@ -106,12 +101,12 @@ classdef DC_agent < handle
                 % check feasibility and activeness for all constraints
                 still_feasible = 1;
                 ag.A{ag.t + 1} = [];
-                x_star = value(ag.x_var);
+                x_star = values_cell(ag.x);
                 for params = ag.L'
                     i = params(1);
                     j = params(2);
                     
-                    [params_act, residuals] = DC_f_check(x_star, i, ag.dc,...
+                    [params_act, residuals] = AC_f_check(x_star, i, ag.ac,...
                                                 ag.wind, ag.t_wind, j);
                     
                     % check for infeasibility
@@ -125,7 +120,7 @@ classdef DC_agent < handle
                 end
                 
                 % see if the solution is still feasible
-                if still_feasible && 0
+                if still_feasible
                     
                     % keep the objective value the same
                     ag.J(ag.t + 1) = ag.J(ag.t);
@@ -142,43 +137,28 @@ classdef DC_agent < handle
 
                         % add constraints to set C_L
                         C_L = [C_L, ...
-                               DC_f_ineq(ag.x_var, i, ag.dc, ...
-                                                   ag.wind, ag.t_wind, j)];
+                               AC_f_ineq(ag.x, i, ag.ac, ag.wind, ag.t_wind, j)];
                     end
-                    
-                    % average incoming x`s to form consensus variable
-                    Z = mean(ag.z, 2);
-                    
-                    % idea: only use the Pg and d_ds and d_us for consensus
-                    % (dont use the bilinear R variables)
-                    
-                    cons_ids = [1:ag.dc.N_G 3*ag.dc.N_G+1:5*ag.dc.N_G];
-                    Obj_consensus = ag.Obj + ...
-                        2*(ag.t + 1) * norm(ag.x_var(cons_ids) - Z(cons_ids));
-                    
                 
                     % optimize again
                     opt = sdpsettings('verbose', 0);
-                    optimize([ag.C_0, C_L], Obj_consensus, opt);
+                    optimize([ag.C_0, C_L], ag.Obj, opt);
                     
                     % update active constraints using the updated solution
                     ag.A{ag.t + 1} = [];
-                    x_star = value(ag.x_var);
+                    x_star = value(ag.x);
                     for params = ag.L'
                         i = params(1);
                         j = params(2);
                         ag.A{ag.t+1} = [ag.A{ag.t+1}; ...
-                                        DC_f_check(x_star, i, ag.dc, ...
+                                        AC_f_check(x_star, i, ag.ac, ...
                                         ag.wind, ag.t_wind, j)];
                     end
                     
                     % update J
-                    ag.J(ag.t + 1) = value(Obj_consensus);
+                    ag.J(ag.t + 1) = value(ag.Obj);
                     
-                end 
-                
-                % update x
-                ag.x(:, ag.t+1) = value(ag.x_var);
+                end                
 
                 % update iteration number
                 ag.t = ag.t + 1;

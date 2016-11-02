@@ -23,16 +23,16 @@ beta = 1e-5;                            % confidence parameter
 % N = ceil(2/epsilon*(zeta-1+log(1/beta)));
 N = 100;
 % generate scenarios
-wind.generate(N);
+wind.dummy(N);
 t_wind = 8;
 
 % divide scenarios and initialize agents
-N_agents = 10;
+N_agents = 3;
 assert(N >= N_agents, 'There cannot be more agents than scenarios');
 cut_index = ceil(linspace(1, N+1, N_agents+1));
 
 % generate random connection graph with fixed diameter
-dm = 3;
+dm = 2;
 G = random_graph(N_agents, dm, 'rand');
 % plot(digraph(G))
 %% create and init agents
@@ -95,12 +95,18 @@ for i = 1:N_agents
     Js(:, i) = [agents(i).J]';
 end
 
+% compare agent solutions
 all_agents_are_close = 1;
-for i = 1:N_agents-1
-    if not( all_close(xstar(:, i), xstar(:, i+1), 1e-4) )
+for j = 1:m-1
+    for i = j+1:m
+       if not( all_close(xstar(:, i), xstar(:, j), 1e-3) )
         all_agents_are_close = 0;
+        fprintf('Biggest diff between x agent %i and %i: \t %g\n', i, j,...
+                                        max(abs(xstar(:,i)-xstar(:,j))));
+       end 
     end
 end
+
 if all_agents_are_close
     fprintf('\nAll agents are close\n');
 else
@@ -160,4 +166,64 @@ set(gca, 'xtick', 1:t);
 legend('Centralized', 'Agents', 'location', 'se');
 
 
-klaarrr
+%% show image of agents constraints
+
+% enable figure
+figure(3);
+set(gcf, 'Name', 'Constraint exchange');
+
+% make all params
+scens = repmat(1:N, N_j, 1);
+all_params = [reshape(scens, N_j*N, 1) repmat([1:N_j]', N, 1)];
+height = N*N_j;
+
+% loop over agents
+for agent_id = 1:m
+    
+    % preallocate image
+    image = zeros(height, t);
+    
+    % enable subfigure
+    subplot(1,m,agent_id);
+    
+    % loop over iterations
+    for iteration = 1:t
+        
+        % retrieve set of constraints
+        A = agents(agent_id).A{iteration};
+        if isempty(A)
+            break;
+        end
+                
+        % loop over pixel rows
+        for row = 1:height
+            
+        % see where difference is 0 (identical)
+            same_scen = A(:, 1) - all_params(row, 1) == 0;
+            same_j = A(:, 2) - all_params(row, 2) == 0;
+
+            % if this is on the same place, we have a match
+            if any(same_scen & same_j)
+                
+                % set pixel to 1
+                image(row, iteration) = 1;
+            end
+
+        end
+        
+    end
+
+    % plot picture
+    imagesc(image);
+    
+    % set labels etc
+    xlabel('Iterations');
+    ylabel('Scenario');
+    ax = gca;
+   
+    ax.YTick = ceil(N_j/2):N_j:N*N_j;
+    ax.YTickLabels = 1:N;
+    singletick
+    title(sprintf('Agent %i', agent_id));
+    
+end

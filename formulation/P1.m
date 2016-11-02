@@ -41,18 +41,17 @@ R_ds = sdpvar(ac.N_G, 1);
 d_us = sdpvar(ac.N_G, 1);
 d_ds = sdpvar(ac.N_G, 1);
 
+% epigraph notation for alpha
+alpha = sdpvar(ac.N_G, 1);
+
 
 figure(2);
 wind.plot(t);
 pause(0.001); % to show plot
 %% Define objective
-Obj = 0;
 
 % P_G for every generator
-for j = 1:ac.N_G
-    k = ac.Gens(j);
-    Obj = Obj + ac.c_us(j)*(trace(ac.Y_k(k)*W_f)+ac.P_D(t,k));
-end
+Obj = sum(alpha);
 
 % Reserve requirements
 lambda = 1;
