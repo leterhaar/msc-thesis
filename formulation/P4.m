@@ -26,11 +26,12 @@ N = 20;
 % wind.use_forecast();
 wind.dummy(N);
 % wind2 = copy(wind);
+t = 17; % for now, do a loop over 24 hours later
+
 wind.use_extremes(t);
 N = 2;
 %% Define problem
 
-t = 17; % for now, do a loop over 24 hours later
 
 W_f = sdpvar(2*ac.N_b); 
 % W_f is a symmetric real valued matrix
@@ -50,9 +51,9 @@ P_mmax = max([wind.P_m(t,:) 0]);
 P_mmin = min([wind.P_m(t,:) 0]);
 for j = 1:ac.N_G
     k = ac.Gens(j);
-    Obj = Obj + ac.c_us(j)*(trace(ac.Y_k(k)*W_f) + lambda*( ...
-                            +trace(ac.Y_k(k)*(W_mds*P_mmax)) + ...
-                            trace(ac.Y_k(k)*(W_mus*P_mmin))));
+    Obj = Obj + ac.c_us(j)*trace(ac.Y_k(k)*W_f) + ...
+                ac.c_ds(j)*trace(ac.Y_k(k)*(W_mds*P_mmax)) + ...
+                ac.c_us(j)*trace(ac.Y_k(k)*(W_mus*P_mmin));
 end
 %% Define constraints
 C = [];

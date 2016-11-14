@@ -23,7 +23,7 @@ wind = wind_model(ac, N_t, 0.2);
 
 % define sample complexity
 N = 2; 
-wind.generate(N);
+% wind.generate(N);
 % wind.use_forecast();
 wind.dummy(N);
 %% Define problem

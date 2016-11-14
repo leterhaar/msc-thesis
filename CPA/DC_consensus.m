@@ -9,7 +9,7 @@ addpath('../wind');
 %% Load models
 
 % load network model
-dc = DC_model('case_ieee30');
+dc = DC_model('case14');
 dc.set_WPG_bus(9);
 
 % load wind model
@@ -24,6 +24,7 @@ beta = 1e-5;                            % confidence parameter
 
 % determine number of scenarios to generate based on Eq (2-4)
 N = ceil(2/epsilon*(zeta-1+log(1/beta)));
+N = 20;
 all_winds.generate(N);
 
 t = 8;              % loop through control horizon later 
@@ -33,10 +34,10 @@ t = 8;              % loop through control horizon later
 % all_winds.dummy(N);
 
 %% Initialize agents
-SPA = 100;                   % number of scenarios per agent
+SPA = 2;                   % number of scenarios per agent
 N_a = ceil(N/SPA);
 
-prg = progress(sprintf('Initializing agents \t'), N_a);
+prg = progress(sprintf('Initializing agents'), N_a);
 agents = cell(N_a,1);
 
 agent_wind = struct('P_wf', all_winds.P_wf,...
@@ -75,7 +76,7 @@ eps = 1e-1;
 max_iter = 50;
 
 while 1
-    prg = progress(sprintf('Iteration %3i \t\t\t', k), N_a);
+    prg = progress(sprintf('Iteration %3i', k), N_a);
     
     % average results to get global variable (i.e. all equal weight 1/N)
     Z = mean(X, 2);

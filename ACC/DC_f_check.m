@@ -6,7 +6,7 @@ function [params_act, residuals] = DC_f_check(x, i, dc, wind, t_wind, j_des)
         j_des = 0;
     end
 
-    tol = 1e-6;
+    tol = 1e-8;
 
     PG_idx = 1:dc.N_G;
     Rus_idx = dc.N_G+1:2*dc.N_G;

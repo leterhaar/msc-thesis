@@ -28,33 +28,32 @@ wind.dummy(N);
 t_wind = 8;
 
 % divide scenarios and initialize agents
-N_agents = 3;
-m = N_agents;
-assert(N >= N_agents, 'There cannot be more agents than scenarios');
-cut_index = ceil(linspace(1, N+1, N_agents+1));
+m = 3;
+assert(N >= m, 'There cannot be more agents than scenarios');
+cut_index = ceil(linspace(1, N+1, m+1));
 
 % generate random connection graph with fixed diameter
 dm = 2;
-G = random_graph(N_agents, dm, 'rand');
+G = random_graph(m, dm, 'rand');
 % plot(digraph(G))
 %% create and init agents
-prg = progress('Initializing', N_agents);
+prg = progress('Initializing', m);
 clear agents
-for i = 1:N_agents
+for i = 1:m
     agents(i) = DC_agent(dc, wind, t_wind, cut_index(i), cut_index(i+1)-1); 
     prg.ping();
 end
 %% 
-ngc = ones(N_agents, 1);
+ngc = ones(m, 1);
 t = 1;
 infeasible = 0;
 
 % while not converged and still feasible
 while all(ngc < 2*dm+1) && not(infeasible) && t < 100
-    prg = progress(sprintf('Iteration %i',t), N_agents);
+    prg = progress(sprintf('Iteration %i',t), m);
     
     % loop over agents
-    for i = 1:N_agents
+    for i = 1:m
         
         % loop over all incoming agents to agent i
         for j = find(G(:, i))';
@@ -92,10 +91,10 @@ end
 %% Validation 
 
 % store value for J and x for all agents
-xstar = zeros(5*dc.N_G, N_agents);
-Js = zeros(100, N_agents);
+xstar = zeros(5*dc.N_G, m);
+Js = zeros(t, m);
 Js_acc = zeros_like(Js);
-for i = 1:N_agents
+for i = 1:m
     xstar(:, i) = agents(i).x(:,t);
     Js(:, i) = [agents(i).J]';
     for it = 1:t
@@ -118,7 +117,6 @@ end
 
 
 %% check the solution against all constraints a posteriori
-tic
 x = sdpvar(5*dc.N_G, 1, 'full');
 C_all = [];
 
@@ -196,15 +194,15 @@ plot(Js_acc, 'g-', 'linewidth', 1);
 singletick
 legend('Centralized', 'Agents', 'location', 'se');
 %% plot disagreement
-xs = zeros(5*dc.N_G, t, N_agents);
-for i = 1:N_agents
+xs = zeros(5*dc.N_G, t, m);
+for i = 1:m
     xs(:, :, i) = agents(i).x(:, 1:t);
 end
 
 disagreement = zeros(46,5);
 zs = mean(xs, 3);
 for i = 1:t
-    for j = 1:N_agents
+    for j = 1:m
         disagreement(i,j) = norm(xs(:,i,j)-zs(:,i));
     end
 end

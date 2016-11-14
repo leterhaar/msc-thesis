@@ -1,0 +1,9 @@
+ax = gca;
+ax.XLabel.Interpreter = 'latex';
+ax.TickLabelInterpreter = 'latex';
+ax.YLabel.Interpreter = 'latex';
+ax.Title.Interpreter = 'latex';
+ax.XLabel.FontSize = 14;
+ax.YLabel.FontSize = 14;
+ax.Title.FontSize = 18;
+% ax.XLabel.String = ['' ax.XLabel.String '}'];

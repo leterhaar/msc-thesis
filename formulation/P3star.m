@@ -2,30 +2,22 @@
 % OtH 6-9-16
 addpath('../misc');
 addpath('../wind');
-
-figure(1);
-set(1, 'name', 'Network');
-dock
-
-figure(2);
-set(2, 'name', 'Wind');
-dock
+tic
 %% Load models
-ac = AC_model('case14');
-ac.set_WPG_bus(9);
-% ac.c_us(3) = 5;
+ac = AC_model('case_ieee30a');
+ac.set_WPG_bus(22);
 
-
-figure(1);
-ac.draw_network();
 
 N_t = 24;
-wind = wind_model(ac, N_t, 0.8);
+wind = wind_model(ac, N_t, 0.2);
 
 % define sample complexity 
-N = 10;
-wind.generate(N);
-% wind2 = copy(wind);
+N = 200;
+N2 = N;
+wind.dummy(N);
+wind2 = copy(wind);
+N = 2;
+wind.use_extremes(t);
 %% Define problem
 
 t = 17; % for now, do a loop over 24 hours later
@@ -39,10 +31,6 @@ W_mds = sdpvar(2*ac.N_b);
 % maximum up and downspinning vectors
 R_us = sdpvar(ac.N_G, 1);
 R_ds = sdpvar(ac.N_G, 1);
-
-figure(2);
-wind.plot(t);
-pause(0.001); % to show plot
 
 %% Define objective
 Obj = 0;
@@ -143,12 +131,18 @@ C = [C, trace(Ysum * W_mds) == 1];
 % Nonnegativity constraints on reserve bounds
 C = [C, R_us >= 0, R_ds >= 0];
 %% Optimize
-opt = sdpsettings('verbose', 0);
+opt = sdpsettings('verbose', 0, 'solver', 'mosek');
 diagnostics = optimize(C, Obj, opt);
+t_total = toc;
 
+i = find(network_sizes == N2);
+total_times(i) = t_total;
+opt_times(i) = diagnostics.solvertime;
+klaarrr
+% objectives(i) = value(Obj);
 %% Evaluate
-% N = 1000;
-% wind = wind2;
+N = N2;
+wind = wind2;
 Wf_opt = value(W_f);
 Wmus_opt = zero_for_nan(value(W_mus));
 Wmds_opt = zero_for_nan(value(W_mds));

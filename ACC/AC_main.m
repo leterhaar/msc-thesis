@@ -6,13 +6,16 @@ addpath('../experiment');
 %% initialize models
 
 N = 10;
-Nm = 3;
+Nm = 1;
+m = ceil(N/Nm);
 
 init_experiment(...
-    'model_name',           'case14',   ...
+    'model_name',           'case14a',   ...
+    'model_windbus',        9, ...
     'model_formulation',    'P3',       ...
     'wind_N',               N,         ...
-    'wind_Nm',              Nm);
+    'wind_Nm',              Nm,         ...
+    'wind_dummy',           1);
 
 t_wind = 8;
 
@@ -21,6 +24,8 @@ diam = 2;
 G = random_graph(m, diam, 'rand');
 % plot(digraph(G))
 %% create and init agents
+clear agents
+
 prg = progress('Initializing', m);
 for i = 1:m
     agents(i) = AC_agent(ac, wind, t_wind, cut(i,1), cut(i,2)); 
@@ -89,17 +94,12 @@ for j = 1:m-1
     for i = j+1:m
        if not( all_close(xstar(:, i), xstar(:, j), 1e-3) )
         all_agents_are_close = 0;
-        fprintf('Biggest diff between x agent %i and %i: \t %g\n', i, j,...
-                                        max(abs(xstar(:,i)-xstar(:,j))));
+        fprintf('|| x_%i - x_%i || = %g\n', i, j,...
+                                        norm(xstar(:,i)-xstar(:,j)));
        end 
     end
 end
 
-if all_agents_are_close
-    fprintf('\nAll agents are close\n');
-else
-    fprintf('\n(!) Not all agents are close\n');
-end
 
 % extract and compare V vectors 
 
@@ -121,8 +121,13 @@ for i = 1:m-1
     for j = i+1:m
        if not( all_close(Xs(:, i), Xs(:, j), 1e-3) )
         all_agents_are_close = 0;
-        fprintf('Biggest diff between V agent %i and %i: \t %g\n', i, j,...
-                                        max(abs(Xs(:,i)-Xs(:,j))));
+        fprintf('|| X_%i - X_%i || = %g\n', i, j,...
+                                        norm(Xs(:,i)-Xs(:,j)));
+       end 
+       if not( all_close(Xms(:, i), Xms(:, j), 1e-3) )
+        all_agents_are_close = 0;
+        fprintf('|| Xm_%i - Xm_%i || = %g\n', i, j,...
+                                        norm(Xs(:,i)-Xs(:,j)));
        end 
     end
 end
@@ -135,6 +140,7 @@ x = {   sdpvar(2*ac.N_b), ...       Wf
         sdpvar(2*ac.N_G, 1)}; ...   Rus and Rdssdpvar(5*dc.N_G, 1, 'full');
 
 % construct all scenario constraints
+C_all = [];
 for i = 1:N
         C_all = [C_all, AC_f_ineq(x, i, ac, wind, t_wind)];
 end
@@ -155,34 +161,55 @@ for i = 1:m
         fprintf('\n\n');
     end
 end
-if feasible_for_all
-    fprintf('All solutions are feasible for all original constraints\n')
-else
-    fprintf('(!) Some solution is infeasible for all original constraints\n');
-end
 
 % add f_0
 C_all = [C_all, AC_f_0(x, ac, wind, t_wind)];
 
 %%
-tic
 % calculate centralized solution
 Obj = AC_f_obj(x, ac, wind, t_wind);
 
 opt = sdpsettings('verbose', 0);
 optimize(C_all, Obj, opt);
+
 xstar_cell_c = values_cell(x);
 xstar_c = [vec(xstar_cell_c{1}); vec(xstar_cell_c{2}); xstar_cell_c{3}];
-toc
+W_c = xstar_cell_c{1};
+Wm_c = xstar_cell_c{2};
+X_c = sqrt(diag(W_c)) .* sign(W_c(:,1));
+Xm_c = sqrt(diag(Wm_c)) .* sign(Wm_c(:,1));
+
 %%
 % compare all solutions to the centralized solution
 agreement = true;
 for i = 1:m
     if not(all_close(xstar(:,i), xstar_c, 1e-3))
-        fprintf('Central solution is different, max diff: \t %g \n', ...
-                        max(abs(xstar_c-xstar(:,i))));
+        fprintf('|| x_%i - x_c || = %g \n', i, norm(xstar_c-xstar(:,i)));
         agreement = false;
     end
+    if not(all_close(Xs(:,i), X_c))
+        fprintf('|| X_%i - X_c || = %g \n', i, norm(X_c - Xs(:,i)));
+        agreement = false;
+    end
+    if not(all_close(Xms(:,i), Xm_c))
+        fprintf('|| Xm_%i - Xm_c || = %g \n', i, norm(Xm_c - Xms(:,i)));
+        agreement = false;
+    end
+    
+end
+
+
+
+if all_agents_are_close
+    fprintf('\nAll agents are close\n');
+else
+    fprintf('\n(!) Not all agents are close\n');
+end
+
+if feasible_for_all
+    fprintf('All solutions are feasible for all original constraints\n')
+else
+    fprintf('(!) Some solution is infeasible for all original constraints\n');
 end
 
 if agreement
@@ -190,6 +217,8 @@ if agreement
 else
     fprintf('(!) Centralized solution is different\n');
 end
+
+
 %%
 
 % plot Js
@@ -207,5 +236,63 @@ plot(Js, 'r-', 'linewidth', 1);
 set(gca, 'xtick', 1:t);
 legend('Centralized', 'Agents', 'location', 'se');
 
-figure(2)
-klaarrr
+%% show image of agents constraints
+% enable figure
+figure(3);
+set(gcf, 'Name', 'Constraint exchange');
+
+% make all params
+scens = repmat(1:N, N_j, 1);
+all_params = [reshape(scens, N_j*N, 1) repmat([1:N_j]', N, 1)];
+height = N*N_j;
+
+% loop over agents
+for agent_id = 1:m
+    
+    % preallocate image
+    the_image = zeros(height, t);
+    
+    % enable subfigure
+    subplot(1,m,agent_id);
+    
+    % loop over iterations
+    for iteration = 1:t
+        
+        % retrieve set of constraints
+        A = agents(agent_id).A{iteration};
+        if isempty(A)
+            break;
+        end
+                
+        % loop over pixel rows
+        for row = 1:height
+            
+        % see where difference is 0 (identical)
+            same_scen = A(:, 1) - all_params(row, 1) == 0;
+            same_j = A(:, 2) - all_params(row, 2) == 0;
+
+            % if this is on the same place, we have a match
+            if any(same_scen & same_j)
+                
+                % set pixel to 1
+                the_image(row, iteration) = 1;
+            end
+
+        end
+        
+    end
+
+    % plot picture
+    imagesc(the_image);
+    
+    % set labels etc
+    xlabel('Iterations');
+    ylabel('Scenario');
+    ax = gca;
+   
+    ax.YTick = ceil(N_j/2):N_j:N*N_j;
+    ax.YTickLabels = 1:N;
+    singletick
+    title(sprintf('Agent %i', agent_id));
+    
+end

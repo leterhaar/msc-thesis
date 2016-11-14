@@ -11,7 +11,8 @@ classdef DC_agent < handle
         L;              % set of constraints for the next iteration
         J;              % value of the objective function
         Jtilde;         % max of neigbouring objectives
-        x;              % sdpbars of the decision variable
+        x;              % sdpvars of the decision variable
+        x_hist;         % collection of xs over the iterations
         t;              % iteration number
         t_wind;         % wind time step
     end
@@ -66,6 +67,9 @@ classdef DC_agent < handle
             
             % set t to 1
             ag.t = 1;
+            
+            % store first x
+            ag.x_hist = x_star;
             
             % init L
             ag.L = [];
@@ -157,12 +161,16 @@ classdef DC_agent < handle
                     ag.J(ag.t + 1) = value(ag.Obj);
                     
                 end                
+                
+                ag.x_hist(:, ag.t + 1) = value(ag.x);
 
                 % update iteration number
                 ag.t = ag.t + 1;
 
                 % reset L
                 ag.L = [];
+                
+                
             end
         end
         

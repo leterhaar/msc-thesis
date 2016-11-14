@@ -2,26 +2,19 @@
 % OtH 6-9-16
 addpath('../misc');
 addpath('../wind');
-
-figure(1);
-set(1, 'name', 'Network');
-dock
-
-figure(2);
-set(2, 'name', 'Wind');
-dock
+tic
 %% Load models
-ac = AC_model('case14');
-ac.set_WPG_bus(9);
+ac = AC_model('case_ieee30a');
+ac.set_WPG_bus(22);
 
-figure(1);
-ac.draw_network();
+% figure(1);
+% ac.draw_network();
 
 N_t = 24;
 wind = wind_model(ac, N_t, 0.2);
 
 % define sample complexity
-N = 20;
+N = 200;
 wind.dummy(N);
 % wind.use_forecast();
 % wind.dummy(N);
@@ -41,17 +34,18 @@ R_ds = sdpvar(ac.N_G, 1);
 d_us = sdpvar(ac.N_G, 1);
 d_ds = sdpvar(ac.N_G, 1);
 
-% epigraph notation for alpha
-alpha = sdpvar(ac.N_G, 1);
-
-
-figure(2);
-wind.plot(t);
-pause(0.001); % to show plot
+% figure(2);
+% wind.plot(t);
+% pause(0.001); % to show plot
 %% Define objective
+Obj = 0;
 
 % P_G for every generator
-Obj = sum(alpha);
+for j = 1:ac.N_G
+    k = ac.Gens(j);
+    Obj = Obj + ac.c_us(j)*(trace(ac.Y_k(k)*W_f)+ac.P_D(t,k));
+end
+
 
 % Reserve requirements
 lambda = 1;
@@ -129,12 +123,18 @@ C = [C, W_f(k_ref, k_ref) == 0];
 % Nonnegativity constraints on reserve bounds
 C = [C, R_us >= 0, R_ds >= 0];
 
+% reserve balancing constraints
 C = [C, ones(1, ac.N_G)*d_us == 1, ones(1, ac.N_G)*d_ds == 1];
 
 %% Optimize
 opt = sdpsettings('verbose', 0, 'debug', 1, 'solver', 'mosek');
 diagnostics = optimize(C, Obj, opt);
+t_total = toc;
 
+i = find(network_sizes == N);
+total_times(i) = t_total;
+opt_times(i) = diagnostics.solvertime;
+objectives(i) = value(Obj);
 %% Evaluate
 Wf_opt = value(W_f);
 Ws_opt = value(W_s);
@@ -184,3 +184,5 @@ else
     fprintf('%s \t in %g seconds\n\n',diagnostics.info, ...
                                                    diagnostics.solvertime);
 end
+%%
+klaarrr
