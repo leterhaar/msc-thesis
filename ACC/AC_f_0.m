@@ -3,8 +3,9 @@ function C = AC_f_0(x, ac, wind, t)
 
     % extract variables from x
     W_f = x{1};
-    W_m = x{2};
-    R = x{3};
+    W_mus = x{2};
+    W_mds = x{3};
+    R = x{4};
     R_us = R(1:ac.N_G);
     R_ds = R(ac.N_G+1:2*ac.N_G);
 

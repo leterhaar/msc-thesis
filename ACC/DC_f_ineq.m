@@ -27,8 +27,6 @@ function [C, params] = DC_f_ineq(x, i, dc, wind, t_wind, j_des)
     for k = 1:dc.N_G   
 
         % generator lower limit
-        
-        % TODO make all single sided
         if j == j_des || j_des == 0
             C = [C, (dc.P_Gmin(k) <= x(PG_idx(k)) + R(k))...
                     :sprintf('Gen lower s%i g%i', i, k)];

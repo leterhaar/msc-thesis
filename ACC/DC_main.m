@@ -111,11 +111,12 @@ for i = 1:m
     if any(residuals < -1e-6)
         feasible_for_all = 0;
         fprintf('Min residual agent %i: \t %g\n', i, min(residuals));
-        assign(x, xstar(:, i));
-        check(C_all(residuals < -1e-6));
+%         assign(x, xstar(:, i));
+%         check(C_all(residuals < -1e-6));
         fprintf('\n\n');
     end
 end
+%%
 % calculate central solution
 C_all = [C_all, DC_f_0(x, dc, wind, t_wind)];
 Obj = DC_f_obj(x, dc, wind, t_wind);

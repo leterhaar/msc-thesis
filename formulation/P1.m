@@ -14,7 +14,7 @@ N_t = 24;
 wind = wind_model(ac, N_t, 0.2);
 
 % define sample complexity
-N = 200;
+N = 300;
 wind.dummy(N);
 % wind.use_forecast();
 % wind.dummy(N);

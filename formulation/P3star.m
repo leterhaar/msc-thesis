@@ -12,12 +12,12 @@ N_t = 24;
 wind = wind_model(ac, N_t, 0.2);
 
 % define sample complexity 
-N = 200;
-N2 = N;
+N = 300;
+% N2 = N;
 wind.dummy(N);
-wind2 = copy(wind);
-N = 2;
-wind.use_extremes(t);
+% wind2 = copy(wind);
+% N = 2;
+% wind.use_extremes(t);
 %% Define problem
 
 t = 17; % for now, do a loop over 24 hours later
@@ -134,15 +134,15 @@ C = [C, R_us >= 0, R_ds >= 0];
 opt = sdpsettings('verbose', 0, 'solver', 'mosek');
 diagnostics = optimize(C, Obj, opt);
 t_total = toc;
-
-i = find(network_sizes == N2);
+%%
+i = find(network_sizes == N);
 total_times(i) = t_total;
 opt_times(i) = diagnostics.solvertime;
 klaarrr
 % objectives(i) = value(Obj);
 %% Evaluate
-N = N2;
-wind = wind2;
+% N = N2;
+% wind = wind2;
 Wf_opt = value(W_f);
 Wmus_opt = zero_for_nan(value(W_mus));
 Wmds_opt = zero_for_nan(value(W_mds));
