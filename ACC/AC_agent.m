@@ -23,26 +23,34 @@ classdef AC_agent < handle
             
             % INITIALIZE SDPVARS
             ag.x = {    sdpvar(2*ac.N_b), ...       Wf
-                        sdpvar(2*ac.N_b), ...       Wm
+                        sdpvar(2*ac.N_b), ...       Wmus
+                        sdpvar(2*ac.N_b), ...       Wmds
                         sdpvar(2*ac.N_G, 1)}; ...   Rus and Rds
             
             % create objective function
-            ag.Obj = AC_f_obj(ag.x, ac, wind, t_wind);
+            ag.Obj = AC_f(ag.x, ac, wind, t_wind);
 
             % create deterministic constraints
-            ag.C_0 = AC_f_0(ag.x, ac, wind, t_wind);
+            ag.C_0 = AC_cons_det(ag.x, ac, wind, t_wind);
             
             % loop over scenarios to create scenario constraints
             C_ineqs = [];
             ag.C_1_params = [];
             
-            for i = i_start:i_end                    
+            for i = i_start:i_end        
+                
                 % inequality constraints
-                [C_ineq, C_params] = AC_f_ineq(ag.x, i, ac, wind, t_wind);
-                C_ineqs = [C_ineqs, C_ineq];
+                C_ineq = AC_cons_scen(ag.x, ac, wind.slice(i), t_wind);
+                
+                % create parameters, last one is -1 for psd constraint
+                Ncons = length(C_ineq);
+                C_params = [ones(Ncons,1)*i [[1:Ncons-1]'; -1]];
                 
                 % store params to inequality constraints
                 ag.C_1_params = [ag.C_1_params; C_params];
+                
+                % store constraints
+                C_ineqs = [C_ineqs, C_ineq];
 
             end
             
@@ -61,6 +69,8 @@ classdef AC_agent < handle
             % store params of active constraints
             ag.A{1} = [];
             x_star = values_cell(ag.x);
+            
+            % TODO adapt this to the new AC_active function
             for i = i_start:i_end
                 ag.A{1} = [ag.A{1};  ...
                        AC_f_check(x_star, i, ac, wind, t_wind)];

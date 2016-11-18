@@ -1,4 +1,4 @@
-function C = AC_f_0(x, ac, wind, t)
+function C = AC_cons_det(x, ac, wind, t)
 % returns the deterministic constraints
 
     % extract variables from x
@@ -6,8 +6,6 @@ function C = AC_f_0(x, ac, wind, t)
     W_mus = x{2};
     W_mds = x{3};
     R = x{4};
-    R_us = R(1:ac.N_G);
-    R_ds = R(ac.N_G+1:2*ac.N_G);
 
     C = [];
     k_ref = ac.N_b + ac.refbus;
@@ -32,11 +30,12 @@ function C = AC_f_0(x, ac, wind, t)
                sprintf('V_bus b%i det', k)];
     end
     % PSD constraint on W_f 
-    C = [C, (W_f >= 0):'PSD on W_f'];
+    C = [C, (W_f >= 0):'PSD on Wf'];
 
     % refbus constraint
     C = [C, (W_f(k_ref, k_ref) == 0):'Refbus Wf'];
-    C = [C, (W_m(k_ref, k_ref) == 0):'Refbus Wm'];
+    C = [C, (W_mus(k_ref, k_ref) == 0):'Refbus Wmus'];
+    C = [C, (W_mds(k_ref, k_ref) == 0):'Refbus Wmds'];
 
     Ysum = zeros_like(ac.Y_k(1));
     for k = ac.Gens'
@@ -44,8 +43,9 @@ function C = AC_f_0(x, ac, wind, t)
     end
 
     % sum Wm = 1
-    C = [C, (trace(Ysum * W_m) == -1):'Balancing constraints'];   
+    C = [C, (trace(Ysum * W_mus) == 1):'Balancing Wmus'];   
+    C = [C, (trace(Ysum * W_mds) == 1):'Balancing Wmds'];
 
     % Nonnegativity constraints on reserve bounds
-    C = [C, (R_us >= 0):'NN Rus', (R_ds >= 0):'NN Rds'];
+    C = [C, (R >= 0):'NonNeg R'];
 end

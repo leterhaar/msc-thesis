@@ -12,7 +12,7 @@ N_t = 24;
 wind = wind_model(ac, N_t, 0.2);
 
 % define sample complexity 
-N = 300;
+N = 10;
 % N2 = N;
 wind.dummy(N);
 % wind2 = copy(wind);

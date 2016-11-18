@@ -1,9 +1,9 @@
-function Obj = AC_f_obj(x, ac, wind, t)
+function Obj = AC_f(x, ac, wind, t)
 % returns the objective function
 
     % extract  variables from x
     W_f = x{1};
-    R = x{3};
+    R = x{4};
 
     % define indexes for variables
     Rus_idx = 1:ac.N_G;
