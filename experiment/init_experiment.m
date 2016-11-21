@@ -68,9 +68,10 @@ function init_experiment(varargin)
     end    
     
     %% Create models
-    addpath('../formulation');
+    addpath('../networks');
     addpath('../wind');
     addpath('../misc');
+    addpath('../formulation');
     
     if strcmpi(exp.model.formulation, 'DC')
         model = DC_model(exp.model.name);

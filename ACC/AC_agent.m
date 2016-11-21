@@ -17,7 +17,7 @@ classdef AC_agent < handle
     end
     
     methods
-        
+
         function ag = AC_agent(ac, wind, t_wind, i_start, i_end)
         % creates constraint set and objective function
             
@@ -46,7 +46,7 @@ classdef AC_agent < handle
                 Ncons = length(C_ineq);
                 C_params = [ones(Ncons,1)*i [[1:Ncons-1]'; -1]];
                 
-                % store params to inequality constraints
+                % store params
                 ag.C_1_params = [ag.C_1_params; C_params];
                 
                 % store constraints
@@ -60,7 +60,9 @@ classdef AC_agent < handle
         
             % optimize
             opt = sdpsettings('verbose', 0);
-            optimize([ag.C_0, C_ineqs], ag.Obj, opt);
+            diagnostics = optimize([ag.C_0, C_ineqs], ag.Obj, opt);
+            assert(not(diagnostics.problem), sprintf(...
+                'Problem initializing agent: %s', diagnostics.info));
 
             % store value of objective function
             ag.J(1) = value(ag.Obj);
@@ -70,10 +72,19 @@ classdef AC_agent < handle
             ag.A{1} = [];
             x_star = values_cell(ag.x);
             
-            % TODO adapt this to the new AC_active function
+            
+            % adapt this to the new AC_active function
             for i = i_start:i_end
-                ag.A{1} = [ag.A{1};  ...
-                       AC_f_check(x_star, i, ac, wind, t_wind)];
+                
+                % check if the problem is indeed feasible
+                problem = AC_check(x_star, ac, wind.slice(i), t_wind);
+                assert(not(problem),  ...
+                     sprintf('A posteriori check failed: %i', problem));
+                 
+                act_params = AC_active(x_star, ac, wind.slice(i), t_wind);
+                
+                ag.A{1} = [ag.A{1};  [ones(length(act_params),1)*i ...
+                                      act_params]];
             end
             
             % set t to 1
@@ -116,17 +127,18 @@ classdef AC_agent < handle
                     i = params(1);
                     j = params(2);
                     
-                    [params_act, residuals] = AC_f_check(x_star, i, ag.ac,...
-                                                ag.wind, ag.t_wind, j);
+                    act_param = AC_active(x_star, ag.ac, ag.wind.slice(i), ...
+                                          ag.t_wind, j);
                     
                     % check for infeasibility
-                    if residuals < -1e-6 || isnan(residuals)
+                    if isempty(act_param)
                         still_feasible = 0;
                         break;
                     end
                     
                     % store the active constraints
-                    ag.A{ag.t + 1} = [ag.A{ag.t+1}; params_act];
+                    ag.A{ag.t + 1} = [ag.A{ag.t+1}; ...
+                                      [ones(length(act_param))*i act_param]];
                 end
                 
                 % see if the solution is still feasible
@@ -147,22 +159,29 @@ classdef AC_agent < handle
 
                         % add constraints to set C_L
                         C_L = [C_L, ...
-                               AC_f_ineq(ag.x, i, ag.ac, ag.wind, ag.t_wind, j)];
+                               AC_cons_scen(ag.x, ag.ac, ag.wind.slice(i), ...
+                                            ag.t_wind, j)];
                     end
                 
                     % optimize again
                     opt = sdpsettings('verbose', 0);
-                    optimize([ag.C_0, C_L], ag.Obj, opt);
+                    diagnostics = optimize([ag.C_0, C_L], ag.Obj, opt);
+                    assert(not(diagnostics.problem), sprintf(...
+                      'Problem optimizing agent: %s', diagnostics.info));
                     
                     % update active constraints using the updated solution
                     ag.A{ag.t + 1} = [];
-                    x_star = value(ag.x);
+                    x_star = values_cell(ag.x);
                     for params = ag.L'
                         i = params(1);
                         j = params(2);
+                        
+                        act_param = AC_active(x_star, ag.ac, ...
+                                              ag.wind.slice(i), ...
+                                              ag.t_wind, j);
+
                         ag.A{ag.t+1} = [ag.A{ag.t+1}; ...
-                                        AC_f_check(x_star, i, ag.ac, ...
-                                        ag.wind, ag.t_wind, j)];
+                                        [ones(length(act_param))*i act_param]]; 
                     end
                     
                     % update J

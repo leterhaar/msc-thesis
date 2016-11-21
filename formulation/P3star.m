@@ -2,17 +2,17 @@
 % OtH 6-9-16
 addpath('../misc');
 addpath('../wind');
-tic
+
 %% Load models
-ac = AC_model('case_ieee30a');
-ac.set_WPG_bus(22);
+ac = AC_model('case14a');
+ac.set_WPG_bus(9);
 
 
 N_t = 24;
 wind = wind_model(ac, N_t, 0.2);
 
 % define sample complexity 
-N = 10;
+N = 2;
 % N2 = N;
 wind.dummy(N);
 % wind2 = copy(wind);
@@ -135,10 +135,10 @@ opt = sdpsettings('verbose', 0, 'solver', 'mosek');
 diagnostics = optimize(C, Obj, opt);
 t_total = toc;
 %%
-i = find(network_sizes == N);
-total_times(i) = t_total;
-opt_times(i) = diagnostics.solvertime;
-klaarrr
+% i = find(network_sizes == N);
+% total_times(i) = t_total;
+% opt_times(i) = diagnostics.solvertime;
+% klaarrr
 % objectives(i) = value(Obj);
 %% Evaluate
 % N = N2;

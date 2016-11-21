@@ -21,6 +21,9 @@ function [g, W_s] = AC_g(x, ac, wind, t, j_des)
         g = sdpvar(N_cons, 1);
     else
         g = zeros(N_cons, 1);
+        % set nans to zero if needed
+        W_mus = zero_for_nan(W_mus);
+        W_mds = zero_for_nan(W_mds);
     end
     
     % define scenario state
@@ -106,8 +109,8 @@ function [g, W_s] = AC_g(x, ac, wind, t, j_des)
         if j_des == j || j_des == 0
             g(j) = ... R
                    - (trace(ac.Y_k(k)*(W_s-W_f)) - ac.C_w(k)*wind.P_m(t)) ...
-                   ... >= R_ds
-                   + R_ds(i);
+                   ... >= -R_ds
+                   - R_ds(i);
         end
         j = j+1;
 

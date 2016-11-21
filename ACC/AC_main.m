@@ -5,7 +5,7 @@ addpath('../experiment');
 
 %% initialize models
 
-N = 10;
+N = 2;
 Nm = 1;
 m = ceil(N/Nm);
 
@@ -17,11 +17,12 @@ init_experiment(...
     'wind_Nm',              Nm,         ...
     'wind_dummy',           1);
 
-t_wind = 8;
+t_wind = 17;
 
 % generate random connection graph with fixed diameter
-diam = 2;
-G = random_graph(m, diam, 'rand');
+dm = 2;
+G = ones(2) - diag(ones(2,1));
+% G = random_graph(m, dm, 'rand');
 % plot(digraph(G))
 %% create and init agents
 clear agents
@@ -37,7 +38,7 @@ t = 1;
 infeasible = 0;
 
 % while not converged and still feasible
-while all(ngc < 2*diam+1) && not(infeasible)
+while all(ngc < 2*dm+1) && not(infeasible) && t < 5
     prg = progress(sprintf('Iteration %i',t), m);
     
     % loop over agents
@@ -78,13 +79,13 @@ end
 %% Validation 
 
 % store value for J and x for all agents
-xstar_cell = cell(3, m);
-xstar = zeros(2*(2*ac.N_b)^2+2*ac.N_G, m);
+xstar_cell = cell(4, m);
+xstar = zeros(3*(2*ac.N_b)^2+2*ac.N_G, m);
 Js = zeros(t, m);
 for i = 1:m
     xstar_cell(:, i) = values_cell(agents(i).x);
-    xstar(:,i) = [vec(xstar_cell{1, i}); vec(xstar_cell{2, i});  ...
-                                                xstar_cell{3, i}];
+    xstar(:,i) = [vec(xstar_cell{1, i}); vec(xstar_cell{2, i}); ...
+                  vec(xstar_cell{3, i}); xstar_cell{4, i}];
     Js(:, i) = [agents(i).J]';
 end
 
@@ -101,83 +102,77 @@ for j = 1:m-1
 end
 
 
-% extract and compare V vectors 
-
-% preallocate voltage vector
-Xs = zeros(2*ac.N_b, m);
-
-% preallocate mismatch voltage vector
-Xms = zeros_like(Xs);
-
-% loop over agents and extract
-for i = 1:m
-    W = xstar_cell{1,i};
-    Wm = xstar_cell{2,i};
-    Xs(:, i) = sqrt(diag(W)) .* sign(W(:,1));
-    Xms(:, i) = sqrt(diag(Wm)) .* sign(Wm(:,1));
-end
-
-for i = 1:m-1
-    for j = i+1:m
-       if not( all_close(Xs(:, i), Xs(:, j), 1e-3) )
-        all_agents_are_close = 0;
-        fprintf('|| X_%i - X_%i || = %g\n', i, j,...
-                                        norm(Xs(:,i)-Xs(:,j)));
-       end 
-       if not( all_close(Xms(:, i), Xms(:, j), 1e-3) )
-        all_agents_are_close = 0;
-        fprintf('|| Xm_%i - Xm_%i || = %g\n', i, j,...
-                                        norm(Xs(:,i)-Xs(:,j)));
-       end 
-    end
-end
+% % extract and compare V vectors 
+% 
+% % preallocate voltage vector
+% Xs = zeros(2*ac.N_b, m);
+% 
+% % preallocate mismatch voltage vector
+% Xms = zeros_like(Xs);
+% 
+% % loop over agents and extract
+% for i = 1:m
+%     W = xstar_cell{1,i};
+%     Wm = xstar_cell{2,i};
+%     Xs(:, i) = sqrt(diag(W)) .* sign(W(:,1));
+%     Xms(:, i) = sqrt(diag(Wm)) .* sign(Wm(:,1));
+% end
+% 
+% for i = 1:m-1
+%     for j = i+1:m
+%        if not( all_close(Xs(:, i), Xs(:, j), 1e-3) )
+%         all_agents_are_close = 0;
+%         fprintf('|| X_%i - X_%i || = %g\n', i, j,...
+%                                         norm(Xs(:,i)-Xs(:,j)));
+%        end 
+%        if not( all_close(Xms(:, i), Xms(:, j), 1e-3) )
+%         all_agents_are_close = 0;
+%         fprintf('|| Xm_%i - Xm_%i || = %g\n', i, j,...
+%                                         norm(Xs(:,i)-Xs(:,j)));
+%        end 
+%     end
+% end
 
 %%
 % check the solution against all constraints a posteriori
 tic
 x = {   sdpvar(2*ac.N_b), ...       Wf
-        sdpvar(2*ac.N_b), ...       Wm
-        sdpvar(2*ac.N_G, 1)}; ...   Rus and Rdssdpvar(5*dc.N_G, 1, 'full');
+        sdpvar(2*ac.N_b), ...       Wmus
+        sdpvar(2*ac.N_b), ...       Wmds
+        sdpvar(2*ac.N_G, 1)}; ...   Rus and Rds
 
+%% check constraints
+feasible_for_all = 1;
+for agent_id = 1:m
+    for i = 1:N
+       problem = AC_check({xstar_cell{:,agent_id}}, ac, wind, t_wind);
+       if problem
+           feasible_for_all = 0;
+           fprintf('Problem type %i with agent %i for scenario %i\n', problem, agent_id, i);
+       end
+    end
+end
+
+%%
 % construct all scenario constraints
 C_all = [];
 for i = 1:N
-        C_all = [C_all, AC_f_ineq(x, i, ac, wind, t_wind)];
-end
-%%
-feasible_for_all = 1;
-for i = 1:m
-    N_j = 6*ac.N_b + 2*ac.N_G + 1;
-    residuals = zeros(N*N_j,1);
-    for j = 1:N
-        offset = (j-1)*N_j;
-        [~, residuals(offset+1:offset+N_j)] = ...
-                        AC_f_check(xstar_cell(:, i), i, ac, wind, t_wind);
-    end
-    if any(residuals < -1e-3)
-        feasible_for_all = 0;
-        fprintf('Min residual agent %i: \t %g\n', i, min(residuals));
-        C_all(residuals < -1e-3)
-        fprintf('\n\n');
-    end
+        C_all = [C_all, AC_cons_scen(x, ac, wind.slice(i), t_wind)];
 end
 
-% add f_0
-C_all = [C_all, AC_f_0(x, ac, wind, t_wind)];
+C_all = [C_all, AC_cons_det(x, ac, wind.slice(1), t_wind)];
 
-%%
 % calculate centralized solution
-Obj = AC_f_obj(x, ac, wind, t_wind);
+Obj = AC_f(x, ac, wind, t_wind);
 
 opt = sdpsettings('verbose', 0);
 optimize(C_all, Obj, opt);
 
 xstar_cell_c = values_cell(x);
-xstar_c = [vec(xstar_cell_c{1}); vec(xstar_cell_c{2}); xstar_cell_c{3}];
+xstar_c = [vec(xstar_cell_c{1}); vec(xstar_cell_c{2}); vec(xstar_cell{3}); xstar_cell_c{4}];
 W_c = xstar_cell_c{1};
-Wm_c = xstar_cell_c{2};
-X_c = sqrt(diag(W_c)) .* sign(W_c(:,1));
-Xm_c = sqrt(diag(Wm_c)) .* sign(Wm_c(:,1));
+Wmup_c = xstar_cell_c{2};
+Wmds_c = xstar_cell_c{2};
 
 %%
 % compare all solutions to the centralized solution
@@ -187,18 +182,7 @@ for i = 1:m
         fprintf('|| x_%i - x_c || = %g \n', i, norm(xstar_c-xstar(:,i)));
         agreement = false;
     end
-    if not(all_close(Xs(:,i), X_c))
-        fprintf('|| X_%i - X_c || = %g \n', i, norm(X_c - Xs(:,i)));
-        agreement = false;
-    end
-    if not(all_close(Xms(:,i), Xm_c))
-        fprintf('|| Xm_%i - Xm_c || = %g \n', i, norm(Xm_c - Xms(:,i)));
-        agreement = false;
-    end
-    
 end
-
-
 
 if all_agents_are_close
     fprintf('\nAll agents are close\n');
@@ -219,13 +203,8 @@ else
 end
 
 
-%%
-
-% plot Js
-figure(2)
-clf
-dock
-
+%% plot Js
+initfig('Js',1);
 hold on
 grid on
 xlabel('iteration')
@@ -240,7 +219,7 @@ legend('Centralized', 'Agents', 'location', 'se');
 % enable figure
 figure(3);
 set(gcf, 'Name', 'Constraint exchange');
-
+N_j = 61;
 % make all params
 scens = repmat(1:N, N_j, 1);
 all_params = [reshape(scens, N_j*N, 1) repmat([1:N_j]', N, 1)];

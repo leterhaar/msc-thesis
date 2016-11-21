@@ -2,8 +2,8 @@
 
 % add helper path
 addpath('../experiment');
-N = 10;
-m = 10;
+N = 2;
+m = 2;
 % init experiment
 init_experiment(...
     'model_name', 'case14a', ... adapted 14 bus network
@@ -14,8 +14,9 @@ init_experiment(...
     'wind_dummy', 1);
 t_wind = 8;
 % generate random connection graph with fixed diameter
-dm = 4;
-G = random_graph(m, dm, 'rand');
+% dm = 4;
+% G = random_graph(m, dm, 'rand');
+G = ones(2) - diag(ones(2,1));
 %% create and init agents
 prg = progress('Initializing', m);
 clear agents
@@ -168,7 +169,7 @@ legend('Centralized', 'Agents', 'location', 'se');
 
 %% show image of agents constraints
 % enable figure
-figure(3);
+figure(2);
 set(gcf, 'Name', 'Constraint exchange');
 
 % make all params
@@ -228,7 +229,7 @@ for agent_id = 1:m
 end
 
 %% plot disagreement
-initfig('disagreements', 1);
+initfig('disagreements', 3);
 disagreements = zeros(t, m);
 
 % loop over agents

@@ -39,7 +39,7 @@ classdef progress < handle
                 obj.previous_perc = floor(perc);
                 % delete the old bar
                 if obj.i ~= 0
-                    fprintf(repmat('\b', 1, 50));
+                    fprintf(repmat('\b', 1, 51));
                 end
                 
                 % running bar
@@ -49,9 +49,9 @@ classdef progress < handle
                                                   obj.i * (obj.N - obj.i));
                     fprintf('[%s] %3d%%   | ', arrow, floor(perc));
                     if isinf(time_remaining)       
-                        fprintf('  ??? s remaining\t');
+                        fprintf('  ??? s remaining\t\n');
                     else
-                        fprintf('%5d s remaining\t', time_remaining);
+                        fprintf('%5d s remaining\t\n', time_remaining);
                     end
                 
                 % complete
