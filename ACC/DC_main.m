@@ -2,8 +2,8 @@
 
 % add helper path
 addpath('../experiment');
-N = 2;
-m = 2;
+N = 10;
+m = 3;
 % init experiment
 init_experiment(...
     'model_name', 'case14a', ... adapted 14 bus network
@@ -14,9 +14,9 @@ init_experiment(...
     'wind_dummy', 1);
 t_wind = 8;
 % generate random connection graph with fixed diameter
-% dm = 4;
-% G = random_graph(m, dm, 'rand');
-G = ones(2) - diag(ones(2,1));
+dm = 2;
+G = random_graph(m, dm, 'rand');
+% G = ones(2) - diag(ones(2,1));
 %% create and init agents
 prg = progress('Initializing', m);
 clear agents

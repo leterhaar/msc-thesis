@@ -11,24 +11,24 @@ function C = AC_cons_scen(x, ac, wind, t_wind, j_des)
     
     % retrieve psd constraint
     if j_des < 0
-        [g, Ws] = AC_g(x, ac, wind, t_wind, 1);
-        C = [Ws >= 0];
+        [~, Ws] = AC_g(x, ac, wind, t_wind, 1);
+        C = [(Ws >= 0):'Ws >= 0'];
         
     % retrieve specific constraint
     elseif j_des > 0
-        g = AC_g(x, ac, wind, t_wind, j_des);
-        C = [g <= 0];
+        [g, ~, labels] = AC_g(x, ac, wind, t_wind, j_des);
+        C = [(g <= 0):labels{j_des}];
     
     % retrieve all
     else
-        [g, Ws] = AC_g(x, ac, wind, t_wind);
+        [g, Ws, labels] = AC_g(x, ac, wind, t_wind);
         
         for j = 1:length(g)
-            C = [C, g(j) <= 0];
+            C = [C, (g(j) <= 0):labels{j}];
         end
         
         % add psd
-        C = [C, [Ws >= 0]];
+        C = [C, [Ws >= 0]:'Ws >= 0'];
     end
     
 end

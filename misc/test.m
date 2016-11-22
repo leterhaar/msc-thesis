@@ -8,7 +8,6 @@ function test(name)
             eval('test_init');
             fprintf('   OK\n');
 
-
             if nargin == 1
                 test_sequence = {name};
             end

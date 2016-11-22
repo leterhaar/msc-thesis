@@ -5,10 +5,11 @@ function problem = AC_check(x, ac, wind, t)
 %
 % 0 : all good
 % 1 : Wf is not PSD
-% 2 : Ws is not PSD
-% 3 : some W is not rank 1
-% 4 : deterministic constraints violated
-% 5 : scenario constraints violated
+% 2 : some Ws is not PSD
+% 3 : Wf is not rank 1
+% 4 : some Ws is not rank 1
+% 5 : deterministic constraints violated
+% 6 : scenario constraints violated
 
     % extract variables from x
     Wf = x{1};
@@ -31,10 +32,21 @@ function problem = AC_check(x, ac, wind, t)
     N = size(wind.P_w, 2);
     for i = 1:N
         Ws = Wf + Wmus * max(0, -wind.P_m(t, i)) - Wmds * max(0, wind.P_m(t,i));
+
+
+        % check rank of Ws
         if not(svd_rank(Ws, 1e2) == 1)
-            problem = 3;
+            problem = 4;
             return
         end
+        
+        % check PSD for Ws
+        if not(is_psd(Ws))
+            problem = 2;
+            return
+        end
+        
+        
     end
 
     % test infeasibility deterministic constraints
@@ -47,7 +59,7 @@ function problem = AC_check(x, ac, wind, t)
     residuals_det = check(C_det);
     
     if any(residuals_det < -1e-6)
-        problem = 4;
+        problem = 5;
         return
     end
     
@@ -56,14 +68,14 @@ function problem = AC_check(x, ac, wind, t)
         for i = 1:N
             residuals = AC_g(x, ac, wind.slice(i), t);
             if any(residuals > 1e-6)
-                problem = 5;
+                problem = 6;
                 return
             end
         end
     else
         residuals = AC_g(x, ac, wind, t);
         if any(residuals > 1e-6)
-            problem = 5;
+            problem = 6;
             return
         end
     end

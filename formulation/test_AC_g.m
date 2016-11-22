@@ -16,11 +16,11 @@ assert(all(size(Ws) == [2*ac.N_b 2*ac.N_b]), 'Ws not right size');
 %% test with sdpvars and a j_des
 
 % pick random box constraint
-j_box = randi(N_box);
-[g1, Ws] = AC_g(x, ac, wind.slice(1), 1, j_box);
+j = randi(N_box);
+[g1, Ws] = AC_g(x, ac, wind.slice(1), 1, j);
 
 % check the upper limit
-g2 = AC_g(x, ac, wind.slice(1), 1, j_box+N_box);
+g2 = AC_g(x, ac, wind.slice(1), 1, j+N_box);
 
 % pick random single constraint
 g3 = AC_g(x, ac, wind.slice(1), 1, randi([2*N_box+1 dim_g]));
@@ -52,16 +52,18 @@ assert(all(size(Ws) == [2*ac.N_b 2*ac.N_b]), 'Ws not right size');
 
 
 %% test with random values and j_des
-% pick a random constraint
-
-for j_box = 1:dim_g
-    % check the lower limit
-    [g, Ws] = AC_g(random_x, ac, wind.slice(1), 1, j_box);
+for j = 1:dim_g
+    % retrieve the residual
+    g = AC_g(random_x, ac, wind.slice(1), 1, j);
 
     % check dimensions and types
     assert(isa(g, 'double'), 'g is not a double');
     assert(all(size(g) == [1, 1]), 'g is not the right dimension');
-    assert(isa(Ws, 'double'), 'Ws is not a sdpvar');
-    assert(all(size(Ws) == [2*ac.N_b 2*ac.N_b]), 'Ws not right size');
+    assert(not(isnan(g)), 'Should not be zero');
 end
+
+% test Ws
+[~, Ws] = AC_g(random_x, ac, wind.slice(1), 1, 1);
+assert(isa(Ws, 'double'), 'Ws is not a sdpvar');
+assert(all(size(Ws) == [2*ac.N_b 2*ac.N_b]), 'Ws not right size');
 
