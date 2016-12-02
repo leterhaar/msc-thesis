@@ -75,9 +75,6 @@ function [xstar, its] = IAPG(x_sdp, f, gradient_f, constraints, varargin)
         x0 = options.x0;
     end
     
-    % make sdpvar
-    % x_sdp = sdpvar(d(1), d(2), options.sdpvar_type);
-
     its = struct(   'x', [], ...        value for x
                     'f', [], ...        objective function value
                     'grad', [], ...     gradient at x
@@ -91,6 +88,25 @@ function [xstar, its] = IAPG(x_sdp, f, gradient_f, constraints, varargin)
     [its(1:m).grad] = deal(gradient_f(x0));
     [its(1:m).subgrad] = deal(zeros_like(x0));
     [its(1:m).time] = deal(nan);
+    
+    %% initialize solvers
+    
+    % create sdpvar for z, past subrads, ak
+    z_sdp = sdpvar(d(1), d(2), 'full');
+    past_subgrads_sdp = sdpvar(d(1), d(2), 'full');
+    a_sdp = sdpvar(1);
+    
+    % define objective with vectorized versions (so matrix also works)
+    Obj = past_subgrads_sdp(:)' * (x_sdp(:) - z_sdp(:)) + ...
+                  1/(2*a_sdp) * norm(x_sdp(:) - z_sdp(:), 2)^2;
+    proximals = cell(m,1);
+    
+    for i = 1:m
+        proximals{i} = optimizer([options.default_constraint; ...
+                                  constraints{i}], Obj, options.opt_settings, ...
+                                  {a_sdp, z_sdp, past_subgrads_sdp}, ...
+                                  x_sdp);
+    end
 
     %% start main iterations
 
@@ -110,31 +126,20 @@ function [xstar, its] = IAPG(x_sdp, f, gradient_f, constraints, varargin)
         past_gradients = zeros_like(x0);
         past_subgrads = zeros_like(x0);
         
-        for l = 0:m-1
+        for li = 0:m-1
             past_gradients = past_gradients + its(k-l).grad;
             past_subgrads = past_subgrads + its(k-l).subgrad;
         end
         
-        z = xk - ak * past_gradients;
-
-        % define objective for prox operator
-        if(min(d) == 1) % x = vector
-            Obj = past_subgrads' * (x_sdp - z) + ...
-                  1/(2*ak) * norm(x_sdp - z, 2)^2;
-        else            % x = matrix
-            Obj = past_subgrads(:)' * (x_sdp(:) - z(:)) + ...
-                  1/(2*ak) * norm(x_sdp - z, 'fro')^2;
-        end
+        zk = xk - ak * past_gradients;
         
-        info = optimize([options.default_constraint, ...
-                                constraints{i}], Obj, options.opt_settings);
-        assert(not(info.problem), sprintf('Problem optimizing: %s', info.info));
+        [x, problem, msg] = proximals{i}(ak, zk, past_subgrads);
+        assert(not(problem), sprintf('Problem optimizing: %s', msg{:}));
 
         % store x(k+1) and its gradient and objective function
-        x = value(x_sdp);
         its(k+1).x = x;
         its(k+1).f = f(x);
-        its(k+1).subgrad = -past_subgrads + (1/ak)*(z-x);
+        its(k+1).subgrad = -past_subgrads + (1/ak)*(zk-x);
         its(k+1).grad = gradient_f(x);
         its(k+1).time = toc;
         

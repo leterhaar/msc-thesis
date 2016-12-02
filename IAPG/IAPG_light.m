@@ -97,7 +97,23 @@ function [xstar, its] = IAPG_light(x_sdp, f, gradient_f, constraints, varargin)
     its(1).grad = gradient_f(x0);
     its(1).f = f(x0);
     its(1).time = nan;
-
+    
+    %% initialize solvers
+    
+    % create sdpvar for z, past subrads, ak
+    z_sdp = sdpvar(d(1), d(2), 'full');
+    a_sdp = sdpvar(1);
+    
+    % define objective with vectorized versions (so matrix also works)
+    Obj = 1/(2*a_sdp) * norm(x_sdp(:) - z_sdp(:), 2)^2;
+    proximals = cell(m,1);
+    
+    for i = 1:m
+        proximals{i} = optimizer([options.default_constraint; ...
+                                  constraints{i}], Obj, options.opt_settings, ...
+                                  {a_sdp, z_sdp}, ...
+                                  x_sdp);
+    end
 
     %% prepare first b iterations
     if verbose
@@ -122,21 +138,12 @@ function [xstar, its] = IAPG_light(x_sdp, f, gradient_f, constraints, varargin)
             past_gradients = past_gradients + gradient_f(its(k-l).x);
         end
 
-        z = xk - ak * (its(k).x + past_gradients);
+        zk = xk - ak * (its(k).x + past_gradients);
 
-        % define objective for prox operator
-        if(min(d) == 1) % x = vector
-            Obj = 1/(2*ak) * norm(x_sdp - z, 2)^2;
-        else            % x = matrix
-            Obj = 1/(2*ak) * norm(x_sdp - z, 'fro')^2;
-        end
-
-        info = optimize([options.default_constraint, ... 
-                               constraints{i}], Obj, options.opt_settings);
-        assert(not(info.problem), sprintf('Problem optimizing: %s', info.info));
+        [x, problem, msg] = proximals{i}(ak, zk);
+        assert(not(problem), sprintf('Problem optimizing: %s', msg{:}));
 
         % store x(k+1) and its gradient and objective function
-        x = value(x_sdp);
         its(k+1).x = x;
         its(k+1).f = f(x);
         its(k+1).grad = gradient_f(x);
@@ -168,21 +175,13 @@ function [xstar, its] = IAPG_light(x_sdp, f, gradient_f, constraints, varargin)
             past_gradients = past_gradients + gradient_f(its(k-l).x);
         end
 
-        z = xk - ak * (its(k).grad + past_gradients);
-
-        % define objective for prox operator
-        if(min(d) == 1) % x = vector
-            Obj = 1/(2*ak) * norm(x_sdp - z, 2)^2;
-        else            % x = matrix
-            Obj = 1/(2*ak) * norm(x_sdp - z, 'fro')^2;
-        end
-
-        info = optimize([options.default_constraint, ...
-                               constraints{i}], Obj, options.opt_settings);
-        assert(not(info.problem), sprintf('Problem optimizing: %s', info.info));
+        zk = xk - ak * (its(k).grad + past_gradients);
+        
+        % solve
+        [x, problem, msg] = proximals{i}(ak, zk);
+        assert(not(problem), sprintf('Problem optimizing: %s', msg{:}));
 
         % store x(k+1) and its gradient and objective function
-        x = value(x_sdp);
         its(k+1).x = x;
         its(k+1).f = f(x);
         its(k+1).grad = gradient_f(x);

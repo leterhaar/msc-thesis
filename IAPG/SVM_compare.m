@@ -3,7 +3,7 @@ addpath('../misc');
 yalmip('clear');
 clear
 d = 2;        % dimension of x
-N = 20;        % number of constraints
+N = 10;        % number of constraints
 max_its = 500; % maximum number of iterations
 b = N;          % upper bound on delay 
 xs = randn(N, d);
@@ -95,7 +95,7 @@ legend('IPG', 'IAPG', 'IAPG-light');
 title('Objective');
 
 %% Plot feasibility percentage
-initfig('Feasibility', 2)
+initfig('Feasibility', 2);
 
 plot([its_IPG.feas]);
 plot([its_IAPG.feas]);
