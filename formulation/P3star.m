@@ -12,7 +12,7 @@ N_t = 24;
 wind = wind_model(ac, N_t, 0.2);
 
 % define sample complexity 
-N = 2;
+N = 3;
 % N2 = N;
 wind.dummy(N);
 % wind2 = copy(wind);
@@ -133,7 +133,9 @@ C = [C, R_us >= 0, R_ds >= 0];
 %% Optimize
 opt = sdpsettings('verbose', 0, 'solver', 'mosek');
 diagnostics = optimize(C, Obj, opt);
-t_total = toc;
+
+x = values_cell({W_f, W_mus, W_mds, [R_us; R_ds]});
+AC_check(x, ac, wind, t)
 %%
 % i = find(network_sizes == N);
 % total_times(i) = t_total;

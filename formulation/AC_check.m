@@ -32,7 +32,7 @@ function problem = AC_check(x, ac, wind, t)
     N = size(wind.P_w, 2);
     for i = 1:N
         Ws = Wf + Wmus * max(0, -wind.P_m(t, i)) - Wmds * max(0, wind.P_m(t,i));
-
+%         svds(Ws)
 
         % check rank of Ws
         if not(svd_rank(Ws, 1e2) == 1)

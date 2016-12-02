@@ -38,7 +38,7 @@ t = 1;
 infeasible = 0;
 
 % while not converged and still feasible
-while all(ngc < 2*dm+1) && not(infeasible) && t < 5
+while all(ngc < 2*dm+1) && not(infeasible) && t < 10
     prg = progress(sprintf('Iteration %i',t), m);
     
     % loop over agents
@@ -145,7 +145,7 @@ x = {   sdpvar(2*ac.N_b), ...       Wf
 feasible_for_all = 1;
 for agent_id = 1:m
     for i = 1:N
-       problem = AC_check({xstar_cell{:,agent_id}}, ac, wind, t_wind);
+       problem = AC_check({xstar_cell{:,agent_id}}, ac, wind.slice(i), t_wind);
        if problem
            feasible_for_all = 0;
            fprintf('Problem type %i with agent %i for scenario %i\n', problem, agent_id, i);

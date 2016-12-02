@@ -15,6 +15,8 @@ function res = all_close(A, B, tol)
             A_tmp = A{i};
             B_tmp = B{i};
             
+            assert(all(size(A_tmp) == size(B_tmp)), 'Should be of same dimensions');
+            
             % vectorize and check difference
             if any(abs(A_tmp(:) - B_tmp(:)) >= tol)
                 res = 0;

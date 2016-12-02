@@ -66,4 +66,3 @@ end
 [~, Ws] = AC_g(random_x, ac, wind.slice(1), 1, 1);
 assert(isa(Ws, 'double'), 'Ws is not a sdpvar');
 assert(all(size(Ws) == [2*ac.N_b 2*ac.N_b]), 'Ws not right size');
-

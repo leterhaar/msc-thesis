@@ -1,5 +1,5 @@
 function [params_act, residuals] = DC_f_check(x, i, dc, wind, t_wind, j_des)
-% [C; params] = DC_f_ineq(x, i, dc, wind, t_wind)
+%  [params_act, residuals] = DC_f_check(x, i, dc, wind, t_wind, j_des)
 % Function to check a constraint for some scenario for solution x
     
     if nargin < 6

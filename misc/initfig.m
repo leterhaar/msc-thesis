@@ -18,11 +18,12 @@ box on
 
 h.Color = ones(3,1) * 250 / 255;
 ax = gca;
-ax.Color = ones(3,1) * 245 / 255;
+% ax.Color = ones(3,1) * 245 / 255;
 % ax.FontName = 'Fira Sans';
 % ax.XLabel.FontSize = 18;
 % ax.YLabel.FontSize = 18;
-
+set(h, 'defaultLineLineWidth', 2)
+title(name);
 
 assignin('base', 'blue', [36 55 58]/255);
 assignin('base', 'green', [128 205 193]/255); 

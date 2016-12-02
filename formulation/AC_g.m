@@ -1,5 +1,5 @@
 function [g, W_s, labels] = AC_g(x, ac, wind, t, j_des)
-% [g, W_s] = AC_g_scen(x, ac, P_wf, P_w, t, j_des)
+% [g, W_s, labels] = AC_g_scen(x, ac, P_wf, P_w, t, j_des)
 % formulation of the constraint functions for one scenario g(x,delta) <= 0
 
     W_f = x{1};
@@ -21,6 +21,7 @@ function [g, W_s, labels] = AC_g(x, ac, wind, t, j_des)
         g = sdpvar(N_cons, 1);
     else
         g = nan(N_cons, 1);
+        
         % set nans to zero if needed
         W_mus = zero_for_nan(W_mus);
         W_mds = zero_for_nan(W_mds);
@@ -97,7 +98,7 @@ function [g, W_s, labels] = AC_g(x, ac, wind, t, j_des)
         j = j+1;
     end
 
-    % build R cosntraints
+    % build R constraints
     for i = 1:ac.N_G
 
         % bus index

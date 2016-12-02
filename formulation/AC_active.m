@@ -3,7 +3,7 @@ function params = AC_active(x, ac, wind, t_wind, j_des)
 % returns the parameters of the active constraints
     
     % tolerance
-    tol = 1e-6;
+    tol = 1e-3;
     
     if nargin < 5
         j_des = 0;

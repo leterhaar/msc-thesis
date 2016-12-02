@@ -1,13 +1,13 @@
-load('../results/DC_scenarios_case30.mat');
+load('../results/AC_dummy.mat');
 
 m = length(agents);
-T = agents{1}.k;
+T = agents.k;
 
 disagreements = zeros(T, m);
-fieldnames = {'P_G', 'R_us', 'R_ds', 'd_us', 'd_ds'};
+fieldnames = {'W_f', 'R_us', 'R_ds', 'W_m'};
 centralX = [];
 for i = 1:5
-    centralX = [centralX; central.X.(fieldnames{i})];
+    centralX = [centralX; vec(central.X.(fieldnames{i}))];
 end
 
 for i = 1:m
