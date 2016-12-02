@@ -83,12 +83,14 @@ function [xstar, its] = IAPG(x_sdp, f, gradient_f, constraints, varargin)
                     );
                 
     %% prepare first m iterations
-    [its(1:m).x] = deal(x0);
-    [its(1:m).f] = deal(f(x0));
-    [its(1:m).grad] = deal(gradient_f(x0));
-    [its(1:m).subgrad] = deal(zeros_like(x0));
-    [its(1:m).time] = deal(nan);
+    [its(1:m+1).x] = deal(x0);
+    [its(1:m+1).f] = deal(f(x0));
+    [its(1:m+1).grad] = deal(gradient_f(x0));
+    [its(1:m+1).subgrad] = deal(zeros_like(x0));
+    [its(1:m+1).time] = deal(nan);
     
+    % store the most recent iterations for every agent
+    li_k = 1:m;
     %% initialize solvers
     
     % create sdpvar for z, past subrads, ak
@@ -114,21 +116,29 @@ function [xstar, its] = IAPG(x_sdp, f, gradient_f, constraints, varargin)
         p = progress('Iterating IAPG', options.max_its - m);
     end
     
-    for k = m:options.max_its
+    for k = m+1:options.max_its
         tic
         % select the next agent
         xk = its(k).x;
-        ak = 0.005;
-        % select a random agent
+        ak = 1/(k+1);
+        % select a random agent and update li_k
         i = randi(m);
+        li_k(i) = k;
 
         % sum past (sub)gradients
         past_gradients = zeros_like(x0);
         past_subgrads = zeros_like(x0);
         
-        for li = 0:m-1
-            past_gradients = past_gradients + its(k-l).grad;
-            past_subgrads = past_subgrads + its(k-l).subgrad;
+        for l_i = li_k
+            
+            % sum the past gradients for all agents
+            past_gradients = past_gradients + its(l_i).grad;
+            
+            % sum subgradient for all agents except current agent
+            if l_i == k
+                continue
+            end
+            past_subgrads = past_subgrads + its(l_i).subgrad;
         end
         
         zk = xk - ak * past_gradients;
@@ -149,5 +159,7 @@ function [xstar, its] = IAPG(x_sdp, f, gradient_f, constraints, varargin)
     
     end
     
+    % return the final value and iterations
     xstar = x;
+    its = its(m+1:end); % remove first m, only used for initialization
 end

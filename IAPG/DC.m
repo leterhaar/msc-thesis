@@ -6,8 +6,8 @@ addpath('../wind');
 addpath('../formulation_dc');
 addpath('../experiment');
 
-N_t = 24;       % number of time steps
-N = 50;        % number of scenarios
+N_t = 24;      % number of time steps
+N = 10;        % number of scenarios
 max_its = 250; % maximum number of iterations
 
 % initialize models
@@ -31,10 +31,11 @@ for i = 1:N
 end
 
 % solve centralized problem
-
+tic
 info = optimize(C_cent, Obj, opt_settings);
 assert(not(info.problem), info.info);
 x_star = value(x);
+toc
 
 % solve problem w/o objective
 info = optimize(C_cent, [], opt_settings);
