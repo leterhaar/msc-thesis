@@ -17,9 +17,9 @@
 %   - max_its       : maximum number of iterations (default 500)
 %   - opt_settings  : optimization settings (default verbose = 0)
 %   - default_constraint : default constraint for every optimization step
+%   - batch         : batch size per iteration (default 1)
 
 function [xstar, its] = IAPG(x_sdp, f, gradient_f, constraints, varargin)
-
     %% Load options and check validity of inputs
     
     % check types of input
@@ -33,7 +33,7 @@ function [xstar, its] = IAPG(x_sdp, f, gradient_f, constraints, varargin)
     % define default options
     options = struct('verbose', 0, 'max_its', 500, 'opt_settings', ...
                      sdpsettings('verbose', 0), 'x0', [], ...
-                     'default_constraint', []);
+                     'default_constraint', [], 'batch', 1);
     def_fields = fieldnames(options);
     
     % load options from varargin
@@ -69,7 +69,7 @@ function [xstar, its] = IAPG(x_sdp, f, gradient_f, constraints, varargin)
         info = optimize([options.default_constraint, ...
                             [constraints{:}]], [], options.opt_settings);
         assert(not(info.problem), 'Problem optimizing: %s', info.info);
-        x0 = value(x);
+        x0 = value(x_sdp);
     else
         assert(all(size(options.x0) == d), 'x0 has the wrong size');
         x0 = options.x0;
@@ -89,9 +89,11 @@ function [xstar, its] = IAPG(x_sdp, f, gradient_f, constraints, varargin)
     [its(1:m+1).subgrad] = deal(zeros_like(x0));
     [its(1:m+1).time] = deal(nan);
     
+    %TODO maybe consider prox operator after evaluating z
+    
     % store the most recent iterations for every agent
     li_k = 1:m;
-    %% initialize solvers
+    %% cache solvers
     
     % create sdpvar for z, past subrads, ak
     z_sdp = sdpvar(d(1), d(2), 'full');
@@ -101,11 +103,19 @@ function [xstar, its] = IAPG(x_sdp, f, gradient_f, constraints, varargin)
     % define objective with vectorized versions (so matrix also works)
     Obj = past_subgrads_sdp(:)' * (x_sdp(:) - z_sdp(:)) + ...
                   1/(2*a_sdp) * norm(x_sdp(:) - z_sdp(:), 2)^2;
-    proximals = cell(m,1);
+              
+    n_batches = ceil(m/options.batch);
+    batch_agents = cell(n_batches,1);
+    proximals = cell(n_batches,1);
+    random_is = randperm(m);
     
-    for i = 1:m
+    for i = 1:n_batches
+        % randomly pick a set of agents for this batch
+        is = random_is((i-1)*options.batch+1:min(i*options.batch, m));
+        batch_agents{i} = is;
         proximals{i} = optimizer([options.default_constraint; ...
-                                  constraints{i}], Obj, options.opt_settings, ...
+                                 [constraints{is}]], Obj,  ...
+                                 options.opt_settings, ...
                                   {a_sdp, z_sdp, past_subgrads_sdp}, ...
                                   x_sdp);
     end
@@ -113,17 +123,19 @@ function [xstar, its] = IAPG(x_sdp, f, gradient_f, constraints, varargin)
     %% start main iterations
 
     if verbose
-        p = progress('Iterating IAPG', options.max_its - m);
+        p = progress('Iterating IAPG', options.max_its);
     end
     
-    for k = m+1:options.max_its
+    for k = m+1:options.max_its+m
         tic
-        % select the next agent
+        
         xk = its(k).x;
-        ak = 1/(k+1);
-        % select a random agent and update li_k
-        i = randi(m);
-        li_k(i) = k;
+        ak = 1/(k+10);
+        
+        % select a random batch and update li_k
+        i = randi(n_batches);
+        is = batch_agents{i};
+        li_k(is) = k;
 
         % sum past (sub)gradients
         past_gradients = zeros_like(x0);
@@ -143,8 +155,15 @@ function [xstar, its] = IAPG(x_sdp, f, gradient_f, constraints, varargin)
         
         zk = xk - ak * past_gradients;
         
-        [x, problem, msg] = proximals{i}(ak, zk, past_subgrads);
-        assert(not(problem), sprintf('Problem optimizing: %s', msg{:}));
+        try
+            [x, problem, msg] = proximals{i}(ak, zk, past_subgrads);
+            assert(not(problem), sprintf('Problem optimizing: %s', msg{:}));
+        catch e
+            warning(e.getReport())
+            [its(k+1:options.max_its+m).x] = deal(zeros_like(x0));
+            [its(k+1:options.max_its+m).f] = deal(nan);
+            break
+        end
 
         % store x(k+1) and its gradient and objective function
         its(k+1).x = x;

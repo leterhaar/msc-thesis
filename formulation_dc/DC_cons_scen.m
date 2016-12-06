@@ -1,7 +1,6 @@
 function C = DC_cons_scen(x, dc, wind)
 % C = AC_cons_scen(x, ac, wind, t_wind, j_des)
 % returns an LMI with all the constraints
-% if j_des < 0, returns only the psd constraint
     
     C = [];
     

@@ -39,19 +39,25 @@ classdef progress < handle
                 obj.previous_perc = floor(perc);
                 % delete the old bar
                 if obj.i ~= 0
-                    fprintf(repmat('\b', 1, 51));
+                    fprintf(repmat('\b', 1, 52));
                 end
                 
                 % running bar
                 if obj.i < obj.N
                     arrow = [repmat('=',1,dec) '>' repmat('.',1,19-dec)];
+                    fprintf('[%s] %3d%%   | ', arrow, floor(perc));
+
+                    % print time
                     time_remaining = ceil(toc(obj.start_time) / ...
                                                   obj.i * (obj.N - obj.i));
-                    fprintf('[%s] %3d%%   | ', arrow, floor(perc));
                     if isinf(time_remaining)       
-                        fprintf('  ??? s remaining\t\n');
+                        fprintf('??:??:?? remaining\t\n');
                     else
-                        fprintf('%5d s remaining\t\n', time_remaining);
+                        hours_remaining = floor(time_remaining / 3600);
+                        time_remaining = rem(time_remaining, 3600);
+                        minutes_remaining = floor(time_remaining / 60);
+                        seconds_remaining = rem(time_remaining, 60);
+                        fprintf('%02i:%02i:%02i remaining\t\n', hours_remaining, minutes_remaining, seconds_remaining);
                     end
                 
                 % complete

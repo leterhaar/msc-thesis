@@ -68,7 +68,12 @@ end
 
 %% test with SDPLIB problem
 tol = 1e-3;
-[C, As, bs, X] = read_sdpa('../sdplib/hinf1.dat-s');
+sdp = read_sdpa('../sdplib/hinf1.dat-s');
+X = sdp.X;
+As = sdp.As;
+bs = sdp.bs;
+C = sdp.C;
+
 Obj = trace(C*X);
 Cons = [X >= 0];
 m = length(As);

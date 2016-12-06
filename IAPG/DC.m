@@ -5,18 +5,19 @@ addpath('../networks/');
 addpath('../wind');
 addpath('../formulation_dc');
 addpath('../experiment');
+addpath('../misc');
 
 N_t = 24;      % number of time steps
-N = 10;        % number of scenarios
-max_its = 250; % maximum number of iterations
+N = 2;       % number of scenarios
+max_its = 500; % maximum number of iterations
 
 % initialize models
 dc = DC_model('case14a');
 dc.set_WPG_bus(9);
 wind = wind_model(dc, N_t, 0.2);
-wind.generate(N);
+wind.dummy(N);
 
-opt_settings = sdpsettings('verbose', 0);
+opt_settings = sdpsettings('verbose', 0, 'solver', 'gurobi');
 %% define problem
 x = sdpvar(5*dc.N_G, N_t, 'full');
 Obj = DC_f(x, dc, wind);
@@ -95,40 +96,55 @@ for i = 1:max_its
     
     p.ping();
 end
-%% plot objectives
-initfig('DC Objectives', 4);
+%% Plot
+initfig('Objectives', 1);
 Obj_opt = DC_f(x_star, dc, wind);
 differences_objective_IPG = abs([its_IPG(2:end).f] - Obj_opt);
 differences_objective_IAPG = abs([its_IAPG(2:end).f] - Obj_opt);
 differences_objective_IAPG2 = abs([its_IAPG2(2:end).f] - Obj_opt);
-differences_objective_IAPG(1:N) = nan;
-% differences_objective_IAPG2(1:N) = nan;
-% differences_objective_IPG(1:b) = nan;
+
+ax = subplot(211);
 hold off
 semilogy(differences_objective_IPG, 'linewidth', 2);
 hold on
 plot(differences_objective_IAPG, 'linewidth', 2);
 plot(differences_objective_IAPG2, 'linewidth', 2);
 grid on
-title('Objectives');
 ylabel('|f(x)-f(x*)|');
-xlabel('Iteration');
-legend('IPG', 'IAPG', 'IAPG light');
+legend('IPG', 'IAPG', 'IAPG-light');
+title('Objective');
+% Plot feasibility percentage
 
-%% Plot feasibility percentage
-initfig('Feasibility', 5);
+ax2 = subplot(212);
 plot([its_IPG.feas]);
-plot([its_IAPG2.feas]);
+hold on
+title('Feasibility');
+
 plot([its_IAPG.feas]);
-legend('IPG', 'IAPG', 'IAPG light');
-xlabel('iteration');
+grid on;
+plot([its_IAPG2.feas]);
+legend('IPG', 'IAPG', 'IAPG-light');
 ylabel('% violated');
+linkaxes([ax, ax2], 'x');
+% 
+% norm_subgrads = arrayfun(@(i) norm([its_IAPG(i).subgrad]), 1:max_its);
+% 
+% ax2 = subplot(212);
+% linkaxes([ax, ax2], 'x');
+% semilogy(norm_subgrads);
+% h = ylabel('$\| \tilde \nabla h_i(x_{k+1})\|$');
+% set(h, 'interpreter','latex');
+% xlabel('iteration');
+
 
 %% plot times
-initfig('Times', 6);
+initfig('Times', 3);
 plot([its_IPG.time]);
 plot([its_IAPG.time]);
 plot([its_IAPG2.time]);
-legend('IPG', 'IAPG', 'IAPG light');
+legend('IPG', 'IAPG', 'IAPG-light');
 ylabel('Time per iteration');
-xlabel('Iteration'); 
+xlabel('Iteration');
+
+%%
+klaarrr

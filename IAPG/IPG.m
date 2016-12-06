@@ -111,7 +111,7 @@ function [xstar, its] = IPG(x_sdp, f, gradient_f, constraints, varargin)
     for k = 1:options.max_its
         tic
         xk = its(k).x;
-        ak = 0.005;
+        ak = 1/(k+1);
         i = randi(min(k,m));
 
         % gradient step at x(k)

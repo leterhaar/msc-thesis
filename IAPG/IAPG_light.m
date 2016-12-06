@@ -117,13 +117,13 @@ function [xstar, its] = IAPG_light(x_sdp, f, gradient_f, constraints, varargin)
 
     %% prepare first b iterations
     if verbose
-        p = progress('Preparing IAPG_light', options.b);
+        p = progress('Iterating IAPG_light', options.max_its);
     end
     
     for k = 1:options.b
         tic
         xk = its(k).x;
-        ak = 0.005;
+        ak = 1/(k+1);
         i = random_i(k);
 
         past_gradients = zeros_like(x0);
@@ -155,10 +155,6 @@ function [xstar, its] = IAPG_light(x_sdp, f, gradient_f, constraints, varargin)
     end
 
     %% start main iterations
-
-    if verbose
-        p = progress('Iterating IAPG_light', options.max_its-options.b);
-    end
 
     for k = options.b+1:options.max_its
         tic

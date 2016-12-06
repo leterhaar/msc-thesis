@@ -1,9 +1,10 @@
 %% DC ACC algorithm
-
+clear
+yalmip('clear');
 % add helper path
 addpath('../experiment');
-N = 10;
-m = 3;
+N = 500;
+m = 8;
 % init experiment
 init_experiment(...
     'model_name', 'case14a', ... adapted 14 bus network
@@ -112,11 +113,24 @@ for i = 1:m
     if any(residuals < -1e-6)
         feasible_for_all = 0;
         fprintf('Min residual agent %i: \t %g\n', i, min(residuals));
-%         assign(x, xstar(:, i));
-%         check(C_all(residuals < -1e-6));
         fprintf('\n\n');
     end
+
+        
 end
+%%
+feas = nan(m, t);
+for ag = 1:m
+    for k = 1:t
+        total_violated = 0;
+        for i = 1:N
+            [~, res] = DC_f_check([agents(ag).x_hist(:,k)], i, dc, wind, t_wind);
+            total_violated = total_violated + sum(res < -1e-6);
+        end
+        feas(ag, k) = total_violated / (N_j*N) * 100;
+    end
+end
+    
 %%
 % calculate central solution
 C_all = [C_all, DC_f_0(x, dc, wind, t_wind)];
@@ -152,6 +166,46 @@ else
     fprintf('(!) Central solution is different\n');
 end
         
+%% plot disagreement
+initfig('Objectives', 1);
+Obj_opt = DC_f_obj(xstar_centralized, dc, wind, t_wind);
+differences = nan(m, t);
+for ag = 1:m
+    for k = 1:t
+        local_obj = DC_f_obj([agents(ag).x_hist(:, k)], dc, wind, t_wind);
+        differences(ag, k) = abs(Obj_opt - local_obj);
+    end
+end
+
+
+ax = subplot(211);
+hold off
+semilogy(differences', 'linewidth', 2);
+hold on
+grid on
+ylabel('|f(x_i)-f(x*)|');
+legend({'Ag1','Ag2','Ag3','Ag4','Ag5'});
+title('Objective');
+% Plot feasibility percentage
+
+ax2 = subplot(212);
+hold on
+title('Feasibility');
+grid on
+plot(feas');
+legend({'Ag1','Ag2','Ag3','Ag4','Ag5'});
+ylabel('% violated');
+linkaxes([ax, ax2], 'x');
+xlabel('Iteration');
+% 
+% norm_subgrads = arrayfun(@(i) norm([its_IAPG(i).subgrad]), 1:max_its);
+% 
+% ax2 = subplot(212);
+% linkaxes([ax, ax2], 'x');
+% semilogy(norm_subgrads);
+% h = ylabel('$\| \tilde \nabla h_i(x_{k+1})\|$');
+% set(h, 'interpreter','latex');
+% xlabel('iteration');
         
 %% plot Js
 initfig('Js', 1);
@@ -228,20 +282,3 @@ for agent_id = 1:m
     
 end
 
-%% plot disagreement
-initfig('disagreements', 3);
-disagreements = zeros(t, m);
-
-% loop over agents
-for i = 1:m
-    
-    % loop over iterations
-    for it = 1:t
-        
-        disagreements(it, i) = norm(agents(i).x_hist(:, it) - xstar_centralized);
-    end
-end
-
-hold off
-semilogy(disagreements, 'linewidth', 2, 'color', blue);
-grid on
