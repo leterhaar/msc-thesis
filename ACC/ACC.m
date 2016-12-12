@@ -40,8 +40,10 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
       isa(constraints, 'lmi'), 'constraints should be lmis');
   
     % store dimensions
-    d = size(x_sdp);
+    d = size(x_sdp, 2);
     [N, d_delta] = size(deltas);
+    Ncons = length(constraints);
+    
     
     % check dimensions
     assert(length(delta_sdp) == d_delta);
@@ -104,7 +106,8 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
     end
     
     
-    
+    % use try block to enter debug mode inside function when encountering
+    % error
     try
     
         %% create connectivity graph
@@ -120,9 +123,17 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
                         'iterations', []);
         
         % divide the initial deltas among the agents
-        Nm = ceil(N/m); % no of constraints per agent
+        Nm = ceil(N/m);             % no of deltas per agent
+        constraint_ids = [1:Ncons]';  % list with constraint identifiers
         for i = 1:m
-            agents(i).initial_deltas = deltas(((i-1)*Nm)+1:min(i*Nm,N), :);
+            % store the deltas in the agent; the first entry of the row
+            % will be the identifier of the constraint, the rest of the row
+            % will be the actual data corresponding to that delta
+            delta_slice = deltas(((i-1)*Nm)+1:min(i*Nm,N), :);
+            identifiers = repmat(constraint_ids, size(delta_slice, 1), 1);
+            agents(i).initial_deltas = [identifiers, ...
+                                        repelem(delta_slice, Ncons, 1)];
+                
         end
         
         [agents.iterations] = deal(struct(  'J', f(options.x0), ...
@@ -168,14 +179,14 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
                     
                     % check feasibility of new set of constraints
                     assign(x_sdp, agents(i).iterations(k).x);
-                    assign(delta_sdp, L(j, :));
-                    residuals = check(constraints);
+                    assign(delta_sdp, L(j, 2:end));
+                    residuals = check(constraints(L(j, 1)));
                     if any(residuals < -1e-4);
                         feasible_for_all = 0;
                     end
                     
                     % merge the solvers with filled deltas together
-                    merged = [merged; the_solver(L(j,:), 'nosolve')];
+                    merged = [merged; the_solver(L(j,2:end), 'nosolve')];
                 end
                 
                 if not(feasible_for_all) || k == 1
@@ -202,8 +213,8 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
                 for j = 1:size(L,1)
                      % check feasibility of new set of constraints
                     assign(x_sdp, agents(i).iterations(k+1).x);
-                    assign(delta_sdp, L(j, :));
-                    residuals = check(constraints);
+                    assign(delta_sdp, L(j, 2:end));
+                    residuals = check(constraints(L(j, 1)));
                     if any(residuals < 1e-6 & residuals > -1e-6);
                         agents(i).iterations(k+1).active_deltas = [
                             agents(i).iterations(k+1).active_deltas;
