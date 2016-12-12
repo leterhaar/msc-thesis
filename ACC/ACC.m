@@ -22,7 +22,7 @@
 %  - n_agents   : number of agents (default ceil(N/10))
 %  - debug      : enter debugging inside function on error (default 0)
 %  - x0         : initial value for x (if empty, zeros)
-%  - max_its    : maximum no of iterations
+%  - max_its    : maximum no of iterations (default 100)
 %
 % RETURNS
 % =======
@@ -54,7 +54,7 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
                      'diameter', 3, ...
                      'debug', 0, ...
                      'n_agents', [],...
-                     'max_its', 15);
+                     'max_its', 100);
     def_fields = fieldnames(options);
     
     % load options from varargin
@@ -137,8 +137,8 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
         %% start main iterations
         k = 1;
         ngc = ones(m, 1);
-        
-        while all(ngc < 2*options.diameter+1) && k < options.max_its
+        loop_active = 1;
+        while loop_active
             
             if verbose
                 prg = progress(sprintf('Iteration %i',k), m);
@@ -227,6 +227,13 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
 
             % update iteration number     
             k = k + 1;
+            
+            if all(ngc >= 2*options.diameter+1)
+                loop_active = 0;
+            elseif k >= options.max_its
+                warning('Maximum iterations (%i) is reached, might not have convergence', options.max_its);
+                loop_active = 0;
+            end
         end
         
         % check if everything went well

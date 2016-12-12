@@ -27,7 +27,7 @@ for i = 1:m
         
         % calculate feasibility percentage
         assign(svm.B, agents(i).iterations(k).x)
-        feasibility(k,i) = sum(check(svm.cons) < -1e-6) / N * 100;
+        feasibility(k,i) = sum(check(svm.cons) < -1e-6) / N_svm * 100;
         
         % store times
         time_per_iteration(k,i) = agents(i).iterations(k).time;
@@ -42,7 +42,7 @@ grid on
 hold on
 plot(convergence);
 ylabel('|f(x_k^i) - f(x^*) |')
-title(sprintf('ACC convergence for SVM with d=%i, m=%i', d, N));
+title(sprintf('ACC convergence for SVM with d=%i, m=%i', d, N_svm));
 
 ax2 = subplot(212);
 linkaxes([ax ax2], 'x');
