@@ -1,0 +1,1 @@
+% idea: make a class that behaves like queue from python that one time

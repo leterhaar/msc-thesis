@@ -1,4 +1,5 @@
 function Obj = DC_f_obj(x, dc, wind, t_wind)
+% Obj = DC_f_obj(x, dc, wind, t_wind)
 % returns the objective function
 
     % define indexes for variables

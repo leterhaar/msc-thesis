@@ -3,8 +3,8 @@ clear
 yalmip('clear');
 % add helper path
 addpath('../experiment');
-N = 500;
-m = 8;
+N = 10;
+m = 3;
 % init experiment
 init_experiment(...
     'model_name', 'case14a', ... adapted 14 bus network
@@ -118,18 +118,7 @@ for i = 1:m
 
         
 end
-%%
-feas = nan(m, t);
-for ag = 1:m
-    for k = 1:t
-        total_violated = 0;
-        for i = 1:N
-            [~, res] = DC_f_check([agents(ag).x_hist(:,k)], i, dc, wind, t_wind);
-            total_violated = total_violated + sum(res < -1e-6);
-        end
-        feas(ag, k) = total_violated / (N_j*N) * 100;
-    end
-end
+
     
 %%
 % calculate central solution
@@ -166,7 +155,7 @@ else
     fprintf('(!) Central solution is different\n');
 end
         
-%% plot disagreement
+%% plot disagreement and feasibility
 initfig('Objectives', 1);
 Obj_opt = DC_f_obj(xstar_centralized, dc, wind, t_wind);
 differences = nan(m, t);
@@ -177,6 +166,18 @@ for ag = 1:m
     end
 end
 
+% check feasibility
+feas = nan(m, t);
+for ag = 1:m
+    for k = 1:t
+        total_violated = 0;
+        for i = 1:N
+            [~, res] = DC_f_check([agents(ag).x_hist(:,k)], i, dc, wind, t_wind);
+            total_violated = total_violated + sum(res < -1e-6);
+        end
+        feas(ag, k) = total_violated / (N_j*N) * 100;
+    end
+end
 
 ax = subplot(211);
 hold off
@@ -184,7 +185,7 @@ semilogy(differences', 'linewidth', 2);
 hold on
 grid on
 ylabel('|f(x_i)-f(x*)|');
-legend({'Ag1','Ag2','Ag3','Ag4','Ag5'});
+% legend({'Ag1','Ag2','Ag3','Ag4','Ag5', 'Ag6', 'Ag7', 'Ag8'});
 title('Objective');
 % Plot feasibility percentage
 
@@ -193,7 +194,7 @@ hold on
 title('Feasibility');
 grid on
 plot(feas');
-legend({'Ag1','Ag2','Ag3','Ag4','Ag5'});
+% legend({'Ag1','Ag2','Ag3','Ag4','Ag5', 'Ag6', 'Ag7', 'Ag8'});
 ylabel('% violated');
 linkaxes([ax, ax2], 'x');
 xlabel('Iteration');
@@ -206,79 +207,70 @@ xlabel('Iteration');
 % h = ylabel('$\| \tilde \nabla h_i(x_{k+1})\|$');
 % set(h, 'interpreter','latex');
 % xlabel('iteration');
+%% Same, but then with the new algorithm
+
+% build problem
+x_sdp = sdpvar(5*dc.N_G,1, 'full');
+delta_sdp = sdpvar(1,2, 'full');
+f = @(x) DC_f_obj(x, dc, wind, t_wind);
+default_constraint = DC_f_0(x_sdp, dc, wind, t_wind);
+constraints_delta = DC_f_ineq_delta(x_sdp, delta_sdp, dc, t_wind);
+opt_settings = sdpsettings('verbose', 2, 'solver', 'gurobi');
+%%
+% build deltas
+deltas = [wind.P_w(t_wind, :)' wind.P_m(t_wind, :)'];
+deltas = zeros(0,2);
+[xstar_acc, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints_delta, ...
+                          'verbose', 1, ...
+                          'default_constraint', default_constraint, ...
+                          'n_agents', m,...
+                          'diameter', dm,...
+                          'debug', 1,...
+                          'opt_settings', opt_settings,...
+                          'max_its', 10);
+
+                      
+%% calculate convergence and feasibility
+m = length(agents);
+K = length(agents(1).iterations);
+
+convergence = nan(K,m);
+feasibility = nan(K,m);
+time_per_iteration = nan(K,m);
+optimal_objective = f(xstar_centralized);
+p = progress('Checking constraints', m);
+for i = 1:m
+    for k = 1:K
+        % calculate difference with centralized objective
+        convergence(k,i) = abs(agents(i).iterations(k).J ...
+                                                - optimal_objective);
         
-%% plot Js
-initfig('Js', 1);
-
-hold on
-grid on
-xlabel('iteration')
-ylabel('J(x*)');
-title('Objective vs iterations for ACC');
-plot(1:t, value(Obj)*ones(1,t), '-.', 'linewidth', 2, 'color', green);
-plot(Js, '-', 'linewidth', 2, 'color', blue);
-set(gca, 'xtick', 1:t);
-legend('Centralized', 'Agents', 'location', 'se');
-
-
-%% show image of agents constraints
-% enable figure
-figure(2);
-set(gcf, 'Name', 'Constraint exchange');
-
-% make all params
-scens = repmat(1:N, N_j, 1);
-all_params = [reshape(scens, N_j*N, 1) repmat([1:N_j]', N, 1)];
-height = N*N_j;
-
-% loop over agents
-for agent_id = 1:m
-    
-    % preallocate image
-    image = zeros(height, t);
-    
-    % enable subfigure
-    subplot(1,m,agent_id);
-    
-    % loop over iterations
-    for iteration = 1:t
+        % calculate feasibility percentage
+        assign(x, agents(i).iterations(k).x)
+        feasibility(k,i) = sum(check(C_all) < -1e-6) / N * 100;
         
-        % retrieve set of constraints
-        A = agents(agent_id).A{iteration};
-        if isempty(A)
-            break;
-        end
-                
-        % loop over pixel rows
-        for row = 1:height
-            
-        % see where difference is 0 (identical)
-            same_scen = A(:, 1) - all_params(row, 1) == 0;
-            same_j = A(:, 2) - all_params(row, 2) == 0;
-
-            % if this is on the same place, we have a match
-            if any(same_scen & same_j)
-                
-                % set pixel to 1
-                image(row, iteration) = 1;
-            end
-
-        end
-        
+        % store times
+        time_per_iteration(k,i) = agents(i).iterations(k).time;
     end
-
-    % plot picture
-    imagesc(image);
-    
-    % set labels etc
-    xlabel('Iterations');
-    ylabel('Scenario');
-    ax = gca;
-   
-    ax.YTick = ceil(N_j/2):N_j:N*N_j;
-    ax.YTickLabels = 1:N;
-    singletick
-    title(sprintf('Agent %i', agent_id));
-    
+    p.ping();
 end
 
+%% plot
+initfig('ACC iterations', 1);
+ax = subplot(211, 'YScale', 'log');
+grid on
+hold on
+plot(convergence);
+ylabel('|f(x_k^i) - f(x^*) |')
+title('Convergence');
+
+ax2 = subplot(212);
+linkaxes([ax ax2], 'x');
+grid on
+hold on
+plot(feasibility);
+ylabel('% violated');
+xlabel('iterations');
+
+initfig('ACC timing', 2);
+plot(time_per_iteration);

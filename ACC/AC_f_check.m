@@ -108,7 +108,11 @@ function [params_act, residuals] = AC_f_check(x, i, ac, wind, t, j_des)
     end
     
     if j == j_des || j_des == 0
-        residuals(j) = min(eig(W_f + W_m * wind.P_m(t, i)));
+        if any(isnan(W_m))
+            residuals(j) = -100;
+        else 
+            residuals(j) = min(eig(W_f + W_m * wind.P_m(t, i)));
+        end
         params(j,:) = [i j];
     end
     

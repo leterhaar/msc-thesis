@@ -1,5 +1,5 @@
 % initialize agent
-ag = AC_agent(ac, wind, 1, 1, 3);
+ag = AC_agent(ac, ac_wind, 1, 1, 3);
 
 Ncons = 6*ac.N_b + 2*ac.N_G + 1;
 % check size of constraints
@@ -13,7 +13,7 @@ assert(not(isnan(value(ag.Obj))), 'optimization should return value');
 all_params = [];
 for i = 1:3
     x = values_cell(ag.x);
-    act_params = AC_active(x, ac, wind.slice(i), 1);
+    act_params = AC_active(x, ac, ac_wind.slice(i), 1);
     all_params = [all_params; ones(length(act_params),1)*i act_params];
 end
 assert(all(size(ag.A{1}) == size(all_params)), 'Params not same size');

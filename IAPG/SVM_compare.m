@@ -1,127 +1,143 @@
 %% Initialize
 addpath('../misc');
+addpath('../formulation_SVM');
 yalmip('clear');
 clear
-d = 25;         % dimension of x
-N = 100;        % number of constraints
-max_its = 500; % maximum number of iterations
-b = N;          % upper bound on delay 
-xs = randn(N, d);
-mean1 = 3*rand(1,d);
-xs = xs + [repmat(mean1, N/2, 1); -repmat(mean1, N/2, 1)];
-ys = [ones(N/2, 1); -ones(N/2, 1)];
+d = 50;                 % dimension of x
+m = 100;                 % number of constraints
+max_its = 500;         % maximum number of iterations
+alpha = @(k) 1/(k+1);  % step size function
 
-%% Create problem
+opt_settings = sdpsettings('verbose', 0, 'solver', 'gurobi');
 
-B = sdpvar(d,1, 'full');
-Obj = 0.5*norm(B,2)^2;
-C_cent = [];
-constraints = cell(N,1);
-for i = 1:N
-    C_cent = [C_cent, ys(i) * xs(i, :) * B >= 1];
-    constraints{i} = ys(i) * xs(i, :) * B >= 1;
+svm = create_SVM(d,m);
+
+% repeat functions and constraints
+fs = cell(m,1);
+[fs{:}] = deal(@(B) svm.f(B) ./ m);
+grad_fs = cell(m,1);
+[grad_fs{:}] = deal(@(B) svm.grad_f(B) ./ m);
+constraints = cell(m,1);
+for i = 1:m
+    constraints{i} = svm.cons(i);
 end
-tic
-opt_settings = sdpsettings('verbose', 0);
-diagnostics = optimize(C_cent, Obj, opt_settings);
-assert(not(diagnostics.problem), diagnostics.info);
-Bstar_cent = value(B);
-toc
 
-% define B0, somewhere in the feasible set
-diagnostics = optimize(C_cent, [], opt_settings);
-assert(not(diagnostics.problem));
-B0 = value(B);
-
+x0 = -10*rand(d,1);
+% x0 = [];
+optimal_objective = svm.f(svm.Bstar);
 %% call problem solver
-
-[Bstar_IPG, its_IPG] = IPG(B, @SVM_f, @SVM_gradient_f, constraints, ...
-                            'x0', B0, ...
+[Bstar_IPG, its_IPG] = IPG(svm.B, fs, grad_fs, constraints, ...
+                            'x0', x0, ...
                             'verbose', 1, ...
-                            'max_its', max_its);
+                            'max_its', max_its, ...
+                            'opt_settings', opt_settings);
 
-[Bstar_IAPG, its_IAPG] = IAPG(B, @SVM_f, @SVM_gradient_f, constraints, ...
-                            'x0', B0, ...
+[Bstar_IAPG, its_IAPG_light] = IAPG_light(svm.B, fs, grad_fs, constraints, ...
+                            'x0', x0, ...
                             'verbose', 1, ...
-                            'max_its', max_its);
+                            'max_its', max_its, ...
+                            'alpha', alpha, ...
+                            'opt_settings', opt_settings);
 
-                          
-[Bstar_IAPG2, its_IAPG2] = IAPG_light(B, @SVM_f, @SVM_gradient_f, constraints, ...
-                           'x0', B0, ...
-                           'verbose', 1, ...
-                           'max_its', max_its, ...
-                           'b', b);
+
+[Bstar_IAPG2, its_IAPG] = IAPG2(svm.B, fs, grad_fs, constraints, ...
+                            'x0', x0, ...
+                            'verbose', 1, ...
+                            'max_its', max_its, ...
+                            'alpha', alpha, ...
+                            'opt_settings', opt_settings);
 
 %% check feasibility a posteriori
 tol = 1e-6;
 p = progress('Checking constraints', max_its);
-for i = 1:max_its
+residuals = nan(max_its,1);
+for k = 1:max_its
+    assign(svm.B, its_IPG(k).x);
+    residuals = check(svm.cons);
+    its_IPG(k).feas = sum(residuals < -1e-6) / m * 100;
     
-    % check IPG
-    assign(B, its_IPG(i).x);
-    residuals = check(C_cent);
-    its_IPG(i).feas = sum(residuals < -tol)/N * 100;
+    assign(svm.B, its_IAPG(k).x);
+    residuals = check(svm.cons);
+    its_IAPG(k).feas = sum(residuals < -1e-6) / m * 100;
     
-    % check IAPG
-    assign(B, its_IAPG(i).x);
-    residuals = check(C_cent);
-    its_IAPG(i).feas = sum(residuals < -tol)/N * 100;
-    
-    % check IAPG2
-    assign(B, its_IAPG2(i).x);
-    residuals = check(C_cent);
-    its_IAPG2(i).feas = sum(residuals < -tol)/N * 100;
+    assign(svm.B, its_IAPG_light(k).x);
+    residuals = check(svm.cons);
+    its_IAPG_light(k).feas = sum(residuals < -1e-6) / m * 100;
     
     p.ping();
 end
-%% plot objectives
-initfig('Objectives', 1);
-differences_objective_IPG = abs([its_IPG(2:end).f] - SVM_f(Bstar_cent));
-differences_objective_IAPG = abs([its_IAPG(2:end).f] - SVM_f(Bstar_cent));
-differences_objective_IAPG2 = abs([its_IAPG2(2:end).f] - SVM_f(Bstar_cent));
+%% calculate differences
+differences_IPG = arrayfun(@(i) abs(svm.f(its_IPG(i).x) ...
+                                          - optimal_objective), 1:max_its);
+differences_IAPG = arrayfun(@(i) abs(svm.f(its_IAPG(i).x) ...
+                                          - optimal_objective), 1:max_its);
+differences_IAPG_light = arrayfun(@(i) abs(svm.f(its_IAPG_light(i).x) ...
+                                          - optimal_objective), 1:max_its);
 
-ax = subplot(211);
+%% calculate norm of h_i(x_k+1)
+norm_his_IAPG = arrayfun(@(i) norm(its_IAPG(i).subgrad), 1:max_its);
+norm_his_IAPG_light = arrayfun(@(i) norm(its_IAPG_light(i).subgrad), 1:max_its);
+running_sum_IAPG = ...
+               arrayfun(@(i) sum(norm_his_IAPG(max(1,i-m):i)), 1:max_its);
+running_sum_IAPG_light = ...
+               arrayfun(@(i) sum(norm_his_IAPG_light(max(1,i-m):i)), 1:max_its);
+           
+norm_his_IAPG_light(norm_his_IAPG_light < 1e-6) = nan;
+norm_his_IAPG(norm_his_IAPG < 1e-6) = nan;
+
+%  plot iterations
+initfig('SVM comparison', 7);
 hold off
-semilogy(differences_objective_IPG, 'linewidth', 2);
+ax = subplot(311);
+semilogy(differences_IPG);
 hold on
-plot(differences_objective_IAPG, 'linewidth', 2);
-plot(differences_objective_IAPG2, 'linewidth', 2);
-grid on
-ylabel('|f(x)-f(x*)|');
-legend('IPG', 'IAPG', 'IAPG-light');
-title('Objective');
-% Plot feasibility percentage
+semilogy(differences_IAPG_light, 'linestyle', '-.');
+semilogy(differences_IAPG);
+grid on;
+title(sprintf('SVM Objectives - step-size %s, d=%i, m=%i, infeasible x0, cyclic', ...
+                                                    funcname(alpha), d, m));
+ylabel('|f(x_k) - f(x^*)|');
+legend('IPG','IAPG-light','IAPG');
 
-ax2 = subplot(212);
-plot([its_IPG.feas]);
+ax2 = subplot(313);
+
 hold on
+plot([its_IPG.feas]');
+plot([its_IAPG_light.feas]', 'linestyle', '-.');
+plot([its_IAPG.feas]');
+grid on;
+ylabel('% violated');
 title('Feasibility');
 
-plot([its_IAPG.feas]);
-grid on;
-plot([its_IAPG2.feas]);
-legend('IPG', 'IAPG', 'IAPG-light');
-ylabel('% violated');
-linkaxes([ax, ax2], 'x');
-% 
-% norm_subgrads = arrayfun(@(i) norm([its_IAPG(i).subgrad]), 1:max_its);
-% 
-% ax2 = subplot(212);
-% linkaxes([ax, ax2], 'x');
-% semilogy(norm_subgrads);
-% h = ylabel('$\| \tilde \nabla h_i(x_{k+1})\|$');
-% set(h, 'interpreter','latex');
-% xlabel('iteration');
+ylim([0 100])
 
+ax3 = subplot(312);
+linkaxes([ax ax2 ax3], 'x');
+hold on
 
-%% plot times
-initfig('Times', 3);
-plot([its_IPG.time]);
-plot([its_IAPG.time]);
-plot([its_IAPG2.time]);
-legend('IPG', 'IAPG', 'IAPG-light');
-ylabel('Time per iteration');
-xlabel('Iteration');
+h1 = plot(0,0, ':');
+h2 = plot(running_sum_IAPG_light, ':');
+h3 = plot(running_sum_IAPG, ':');
+plot(norm_his_IAPG_light, 'x', 'color', get(h2, 'color'));
+plot(norm_his_IAPG, 'o', 'color', get(h3, 'color'));
+
+h = legend( '$\| \tilde \nabla h_i(x_{k+1}) \|$ - IPG', ...
+            '$\| \tilde \nabla h_i(x_{k+1}) \|$ - IAPG light', ...
+            '$\| \tilde \nabla h_i(x_{k+1}) \|$ - IAPG', ...
+            '$ \sum_{j \neq i} \| \tilde \nabla h_j(x_{k+1}) \| $ - IPG', ...
+            '$ \sum_{j \neq i} \| \tilde \nabla h_j(x_{k+1}) \| $ - IAPG light', ...
+            '$ \sum_{j \neq i} \| \tilde \nabla h_j(x_{k+1}) \| $ - IAPG');
+set(h, 'interpreter', 'latex')
+grid on
+xlabel('Iterations');
+title('Magnitude of $\tilde \nabla h_i(x_{k+1})$', 'interpreter', 'latex');
+ylabel('$\| \tilde \nabla h_i(x_{k+1}) \| $', 'interpreter', 'latex');
+xlim([0 500]);
+%%  plot delay
+initfig('Max delay', 6);
+plot([its_IAPG.b], 'color', blue);
+plot([its_IAPG_light.b], 'color', orange, 'linestyle', '-.');
+legend('IAPG - start with IPG', 'IAPG - start with aggregation');
 
 %% 
 klaarrr

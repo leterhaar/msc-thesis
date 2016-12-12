@@ -12,6 +12,7 @@ classdef AC_agent < handle
         J;              % value of the objective function
         Jtilde;         % max of neigbouring objectives
         x;              % sdpvars of the decision variable
+        x_hist;         % previous versions of x
         t;              % iteration number
         t_wind;         % wind time step
     end
@@ -92,6 +93,9 @@ classdef AC_agent < handle
             
             % init L
             ag.L = [];
+            
+            % store X
+            ag.x_hist{1} = x_star;
 
         end
         
@@ -187,6 +191,7 @@ classdef AC_agent < handle
                     % update J
                     ag.J(ag.t + 1) = value(ag.Obj);
                     
+                    
                 end                
 
                 % update iteration number
@@ -194,6 +199,9 @@ classdef AC_agent < handle
 
                 % reset L
                 ag.L = [];
+                    
+                % store x
+                ag.x_hist{ag.t + 1} = x_star;
             end
         end
         

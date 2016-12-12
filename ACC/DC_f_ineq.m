@@ -14,7 +14,7 @@ function [C, params] = DC_f_ineq(x, i, dc, wind, t_wind, j_des)
     
     % define reserve power
     R = x(dus_idx) * max(0, -wind.P_m(t_wind, i)) ...
-                    - x(dds_idx) * max(0, wind.P_m(t_wind, i));                
+                                - x(dds_idx) * max(0, wind.P_m(t_wind, i));                
                 
                 
     % define scenario power injection vector

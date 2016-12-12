@@ -1,39 +1,42 @@
-%% [xstar, iterations] = IPG(x, f, gradient_f, constraints, ...)
+%% [xstar, iterations] = IPG(x, fs, grad_fs, constraints, ...)
 % runs the incremtal proximal gradient algorithm and returns iterations
 % 
-% solves min_ f(x) s.t. x \in X_i for i = 1,...,m
+% solves min_ F(x) = sum f_i(x) s.t. x \in X_i for i = 1,...,m
 %
 % PARAMETERS
 % * x               : an sdpvar
-% * f               : a function handle to the smooth part of the objective
-%                     function f(x)
-% * gradient_f      : a function handle to the gradient of the smooth part
+% * fs              : a cell of m function handles to the smooth part of 
+%                     the objective function f_i(x)
+% * grad_fs         : a cell of m function handles to the gradient of the smooth part
 %                     of the objective function gradient_f(x)
-% * constraints     : a cell of constraint sets
+% * constraints     : a cell of m constraint sets
 % * options         : set of options, optional, as follows
 %   - x0            : value for x0. if empty, a feasible x0 will be found
 %   - verbose       : 0 (default) or 1 (show progress)
 %   - max_its       : maximum number of iterations (default 500)
 %   - opt_settings  : optimization settings (default verbose = 0)
 %   - default_constraint : default constraint for every optimization step
+%   - alpha         : function handle for alpha. default alpha = 1/(k+1)
 
 
-function [xstar, its] = IPG(x_sdp, f, gradient_f, constraints, varargin)
+
+function [xstar, its] = IPG(x_sdp, fs, grad_fs, constraints, varargin)
 
     %% Load options and check validity of inputs
     
     % check types of input
     assert(isa(x_sdp, 'sdpvar'), 'x should be sdpvar');
-    assert(isa(f, 'function_handle'), 'f should be function handle');
-    assert(isa(gradient_f, 'function_handle'), ...
-                                   'gradient_f should be function handle');
+    assert(isa(fs, 'cell') && isa(fs{1}, 'function_handle'), ...
+                                'fs should be cell with function handles');
+    assert(isa(grad_fs, 'cell') && isa(grad_fs{1}, 'function_handle'), ...
+                           'grad_fs should be cell with function handles');
     assert(isa(constraints, 'cell') && (isa(constraints{1}, 'constraint') || ...
-           isa(constraints{1}, 'lmi')), 'constraints should be constraints');
+      isa(constraints{1}, 'lmi')), 'constraints should be cell with lmis');
     
     % define default options
     options = struct('verbose', 0, 'max_its', 500, 'opt_settings', ...
                      sdpsettings('verbose', 0), 'x0', [], ...
-                     'default_constraint', []);
+                     'default_constraint', [], 'alpha', @(k) 1/(k+1));
     def_fields = fieldnames(options);
     
     % load options from varargin
@@ -66,7 +69,8 @@ function [xstar, its] = IPG(x_sdp, f, gradient_f, constraints, varargin)
     
     % find feasible x0
     if isempty(options.x0)
-        info = optimize([constraints{:}], [], options.opt_settings);
+        info = optimize([options.default_constraint; constraints{:}], [],...
+                                                    options.opt_settings);
         assert(not(info.problem), 'Problem optimizing: %s', info.info);
         x0 = value(x_sdp);
     else
@@ -76,18 +80,16 @@ function [xstar, its] = IPG(x_sdp, f, gradient_f, constraints, varargin)
 
     its = struct(   'x', [], ...        value for x
                     'f', [], ...        objective function value
-                    'grad', [], ...     gradient at x
                     'time', []...       time per iterations    
                     );
-
+    i = randi(m);
     its(1).x = x0;
-    its(1).grad = gradient_f(x0);
-    its(1).f = f(x0);
+    its(1).f = fs{i}(x0);
     its(1).time = nan;
     
     %% initialize solvers
     
-    % create sdpvar for z, past subrads, ak
+    % create sdpvar for z, ak
     z_sdp = sdpvar(d(1), d(2), 'full');
     a_sdp = sdpvar(1);
     
@@ -95,11 +97,21 @@ function [xstar, its] = IPG(x_sdp, f, gradient_f, constraints, varargin)
     Obj = 1/(2*a_sdp) * norm(x_sdp(:) - z_sdp(:), 2)^2;
     proximals = cell(m,1);
     
+    if isempty(options.opt_settings.solver)
+        warning('Calling optimizer with no solver specified!');
+    end
+    
+    if verbose
+        p = progress('Preparing IPG', m);
+    end
     for i = 1:m
         proximals{i} = optimizer([options.default_constraint; ...
                                   constraints{i}], Obj, options.opt_settings, ...
                                   {a_sdp, z_sdp}, ...
                                   x_sdp);
+        if verbose
+            p.ping();
+        end
     end
 
 
@@ -111,11 +123,11 @@ function [xstar, its] = IPG(x_sdp, f, gradient_f, constraints, varargin)
     for k = 1:options.max_its
         tic
         xk = its(k).x;
-        ak = 1/(k+1);
-        i = randi(min(k,m));
+        ak = options.alpha(k);
+        i = randi(m);
 
         % gradient step at x(k)
-        zk = xk - ak * its(k).grad;
+        zk = xk - ak * grad_fs{i}(xk);
 
         % solve
         [x, problem, msg] = proximals{i}(ak, zk);
@@ -123,8 +135,7 @@ function [xstar, its] = IPG(x_sdp, f, gradient_f, constraints, varargin)
 
         % store x(k+1) and its gradient and objective function
         its(k+1).x = x;
-        its(k+1).f = f(x);
-        its(k+1).grad = gradient_f(x);
+        its(k+1).f = fs{i}(x);
         its(k+1).time = toc;
         
         if verbose

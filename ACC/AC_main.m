@@ -5,8 +5,8 @@ addpath('../experiment');
 
 %% initialize models
 
-N = 2;
-Nm = 1;
+N = 5;
+Nm = 2;
 m = ceil(N/Nm);
 
 init_experiment(...
@@ -21,8 +21,8 @@ t_wind = 17;
 
 % generate random connection graph with fixed diameter
 dm = 2;
-G = ones(2) - diag(ones(2,1));
-% G = random_graph(m, dm, 'rand');
+% G = ones(2) - diag(ones(2,1));
+G = random_graph(m, dm, 'rand');
 % plot(digraph(G))
 %% create and init agents
 clear agents
@@ -202,6 +202,51 @@ else
     fprintf('(!) Centralized solution is different\n');
 end
 
+%% plot disagreement and feasibility
+initfig('Objectives', 1);
+Obj_opt = AC_f(xstar_cell_c, ac, wind, t_wind);
+differences = nan(m, t);
+for ag = 1:m
+    for k = 1:t
+        local_obj = agents(ag).J(k);
+        differences(ag, k) = abs(Obj_opt - local_obj);
+    end
+end
+
+% check feasibility
+feas = nan(m, t);
+for ag = 1:m
+    for k = 1:t
+        total_violated = 0;
+        for i = 1:N
+            if ~isempty(agents(ag).x_hist{k})
+                [~, res] = AC_f_check([agents(ag).x_hist{k}], i, ac, wind, t_wind);
+                total_violated = total_violated + sum(res < -1e-6);
+            end
+        end
+        feas(ag, k) = total_violated / (N_j*N) * 100;
+    end
+end
+
+ax = subplot(211);
+hold off
+semilogy(differences', 'linewidth', 2);
+hold on
+grid on
+ylabel('|f(x_i)-f(x*)|');
+legend({'Ag1','Ag2','Ag3'});
+title('Objective');
+% Plot feasibility percentage
+
+ax2 = subplot(212);
+hold on
+title('Feasibility');
+grid on
+plot(feas');
+legend({'Ag1','Ag2','Ag3','Ag4','Ag5'});
+ylabel('% violated');
+linkaxes([ax, ax2], 'x');
+xlabel('Iteration');
 
 %% plot Js
 initfig('Js',1);

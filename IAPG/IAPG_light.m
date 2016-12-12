@@ -1,13 +1,14 @@
-%% [xstar, iterations] = IPG(x, f, gradient_f, constraints, ...)
-% runs the incremtal proximal gradient algorithm and returns iterations
+%% [xstar, iterations] = IAPG(x, f, gradient_f, constraints, ...)
+% runs the incremtal aggregated proximal gradient algorithm and returns 
+% solution and iterations
 % 
 % solves min_ f(x) s.t. x \in X_i for i = 1,...,m
 %
 % PARAMETERS
 % * x               : an sdpvar
-% * f               : a function handle to the smooth part of the objective
-%                     function f(x)
-% * gradient_f      : a function handle to the gradient of the smooth part
+% * fs              : a cell of m function handles to the smooth part of 
+%                     the objective function f_i(x)
+% * grad_fs         : a cell of m function handles to the gradient of the smooth part
 %                     of the objective function gradient_f(x)
 % * constraints     : a cell of constraint sets
 % * options         : set of options, optional, as follows
@@ -15,25 +16,27 @@
 %   - verbose       : 0 (default) or 1 (show progress)
 %   - max_its       : maximum number of iterations (default 500)
 %   - opt_settings  : optimization settings (default verbose = 0)
-%   - b             : maximum delay (default 5)
 %   - default_constraint : default constraint for every optimization step
+%   - alpha         : function handle for alpha. default alpha = 1/(k+1)
 
-function [xstar, its] = IAPG_light(x_sdp, f, gradient_f, constraints, varargin)
+
+function [xstar, its] = IAPG_light(x_sdp, fs, grad_fs, constraints, varargin)
 
     %% Load options and check validity of inputs
     
     % check types of input
     assert(isa(x_sdp, 'sdpvar'), 'x should be sdpvar');
-    assert(isa(f, 'function_handle'), 'f should be function handle');
-    assert(isa(gradient_f, 'function_handle'), ...
-                                   'gradient_f should be function handle');
+    assert(isa(fs, 'cell') && isa(fs{1}, 'function_handle'), ...
+                                'fs should be cell with function handles');
+    assert(isa(grad_fs, 'cell') && isa(grad_fs{1}, 'function_handle'), ...
+                           'grad_fs should be cell with function handles');
     assert(isa(constraints, 'cell') && (isa(constraints{1}, 'constraint') || ...
-           isa(constraints{1}, 'lmi')), 'constraints should be constraints');
+      isa(constraints{1}, 'lmi')), 'constraints should be cell with lmis');
     
     % define default options
     options = struct('verbose', 0, 'max_its', 500, 'opt_settings', ...
-                     sdpsettings('verbose', 0), 'x0', [], 'b', 5, ...
-                     'default_constraint', []);
+                     sdpsettings('verbose', 0), 'x0', [], ...
+                     'default_constraint', [], 'alpha', @(k) 1/(k+1));
     def_fields = fieldnames(options);
     
     % load options from varargin
@@ -74,120 +77,132 @@ function [xstar, its] = IAPG_light(x_sdp, f, gradient_f, constraints, varargin)
         assert(all(size(options.x0) == d), 'x0 has the wrong size');
         x0 = options.x0;
     end
-
-    % find random permutations of 1:m
-    all_i = 1:m;
-    if options.max_its > m
-        random_i = [];
-        for j = 1:ceil(options.max_its/m)
-            random_i = [random_i; randperm(m)];
-        end
-        random_i = random_i(1:options.max_its);
-    else
-        random_i = randperm(m, options.max_its);
-    end
-
+    
     its = struct(   'x', [], ...        value for x
                     'f', [], ...        objective function value
-                    'grad', [], ...     gradient at x
-                    'time', []...       time per iterations    
+                    'subgrad', [], ...  subgradient for projection at x
+                    'time', [],...       time per iterations    
+                    'b', []...         bound on delay
                     );
-
+        
     its(1).x = x0;
-    its(1).grad = gradient_f(x0);
-    its(1).f = f(x0);
-    its(1).time = nan;
+                
+    %% cache solvers
     
-    %% initialize solvers
+    if verbose
+        p = progress('Preparing IAPG-l', 2*m);
+    end
     
-    % create sdpvar for z, past subrads, ak
+    if isempty(options.opt_settings.solver)
+        warning('Calling optimizer with no solver specified!');
+    end
+    
+    % create sdpvar for z, past subgrads, ak
     z_sdp = sdpvar(d(1), d(2), 'full');
     a_sdp = sdpvar(1);
     
     % define objective with vectorized versions (so matrix also works)
     Obj = 1/(2*a_sdp) * norm(x_sdp(:) - z_sdp(:), 2)^2;
-    proximals = cell(m,1);
     
+    proximals = cell(m,1);
     for i = 1:m
         proximals{i} = optimizer([options.default_constraint; ...
-                                  constraints{i}], Obj, options.opt_settings, ...
+                                 [constraints{i}]], Obj,  ...
+                                  options.opt_settings, ...
                                   {a_sdp, z_sdp}, ...
                                   x_sdp);
-    end
-
-    %% prepare first b iterations
-    if verbose
-        p = progress('Iterating IAPG_light', options.max_its);
+                              
+        if verbose
+            p.ping();
+        end
     end
     
-    for k = 1:options.b
-        tic
+    %% prepare first m iterations
+    li_k = nan(1,m);
+    for k = 1:m
+        
+        % loop over all agents
+        i = rem(k-1, m) + 1;
         xk = its(k).x;
-        ak = 1/(k+1);
-        i = random_i(k);
-
+        ak = options.alpha(k);
+        
+        % gradient step (aggregate only the available (sub)gradients)
         past_gradients = zeros_like(x0);
-
-        % loop over other indices than i
-        for j = all_i(all_i ~= i)
-            if k > 1
-                l = randi(k-1); % let the delay be dependent (for preparation only)
-            else
-                l = 0;
-            end
-            past_gradients = past_gradients + gradient_f(its(k-l).x);
+        past_subgrads = zeros_like(x0);
+        
+        for l_i = li_k(not(isnan(li_k)))
+            
+            % sum gradients for all agents except current agent
+            past_gradients = past_gradients + its(l_i).grad;
         end
-
-        zk = xk - ak * (its(k).x + past_gradients);
-
-        [x, problem, msg] = proximals{i}(ak, zk);
+        
+        zk = xk - ak * (grad_fs{i}(xk) + past_gradients);
+        
+        [next_x, problem, msg] = proximals{i}(ak, zk);
         assert(not(problem), sprintf('Problem optimizing: %s', msg{:}));
 
-        % store x(k+1) and its gradient and objective function
-        its(k+1).x = x;
-        its(k+1).f = f(x);
-        its(k+1).grad = gradient_f(x);
-        its(k+1).time = toc;
+        its(k+1).x = next_x;
+        its(k+1).f = fs{i}(next_x);
+        its(k+1).grad = grad_fs{i}(next_x);
+        its(k+1).b = max(k - li_k);
+        
+        li_k(i) = k+1;
         
         if verbose
-            p.ping(); 
+            p.ping();
         end
+        
     end
 
     %% start main iterations
 
-    for k = options.b+1:options.max_its
+    if verbose
+        p = progress('Iterating IAPG-l', options.max_its);
+    end
+    
+    all_is = 1:m;
+    
+    for k = m+1:options.max_its+m+1
         tic
-        xk = its(k).x;
-        ak = 1/(k+1);
-        i = random_i(k);
-
-        past_gradients = zeros_like(x0);
-
-        % loop over other indices than i
-        for j = all_i(all_i ~= i)
-            % choose a random delay
-            l = randi(options.b);
-            past_gradients = past_gradients + gradient_f(its(k-l).x);
-        end
-
-        zk = xk - ak * (its(k).grad + past_gradients);
         
-        % solve
-        [x, problem, msg] = proximals{i}(ak, zk);
+        xk = its(k).x;
+        ak = options.alpha(k);
+        
+        % select a random agent
+        i = randi(m);           % random
+%         i = rem(k-1, m) + 1;  % cycling
+        all_except_i = all_is(all_is ~= i);
+
+        % sum past (sub)gradients
+        past_gradients = zeros_like(x0);
+        
+        for l_i = li_k(all_except_i)
+            
+            % sum gradients for all agents except current agent
+            past_gradients = past_gradients + its(l_i).grad;
+        end
+        
+        zk = xk - ak * (grad_fs{i}(xk) + past_gradients);
+        
+        [next_x, problem, msg] = proximals{i}(ak, zk);
         assert(not(problem), sprintf('Problem optimizing: %s', msg{:}));
 
         % store x(k+1) and its gradient and objective function
-        its(k+1).x = x;
-        its(k+1).f = f(x);
-        its(k+1).grad = gradient_f(x);
+        its(k+1).x = next_x;
+        its(k+1).f = fs{i}(next_x);
         its(k+1).time = toc;
+        its(k+1).grad = grad_fs{i}(xk);
+        its(k+1).b = max(k - li_k);
+
+        li_k(i) = k + 1;
         
         if verbose
             p.ping(); 
         end
-
+    
     end
     
-    xstar = x;
+    % return the final value and iterations
+    xstar = next_x;
+%     its = its(m+1:end); % remove first m, only used for initialization
 end

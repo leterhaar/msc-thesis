@@ -1,6 +1,6 @@
 function test(name)
 % init test variables
-
+    yalmip('clear');
     for file = dir'
         if strcmp(file.name,'test_init.m');
             path = strsplit(pwd, '/');

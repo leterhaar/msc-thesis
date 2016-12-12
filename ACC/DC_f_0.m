@@ -1,4 +1,5 @@
 function C = DC_f_0(x, dc, wind, t_wind)
+% C = DC_f_0(x, dc, wind, t_wind)
 % returns the deterministic constraints
 
     PG_idx = 1:dc.N_G;
