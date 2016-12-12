@@ -4,7 +4,7 @@
 m = 100;
 d = 20;
 svm = create_SVM(d,m);
-opt_settings = sdpsettings('verbose', 0, 'solver', 'mosek');
+opt_settings = sdpsettings('verbose', 0, 'solver', 'gurobi');
 
 Obj = svm.f(svm.B);
 

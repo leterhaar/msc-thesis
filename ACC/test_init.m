@@ -16,4 +16,4 @@ wind = wind_model(dc, 24, 0.2);
 wind.generate(N);
 t_wind = randi(24);
  
-test_sequence = {'equivalence_solvers', 'ACC'}; % 'AC_agent'
+test_sequence = {'equivalence_svm', 'ACC'}; % 'AC_agent'
