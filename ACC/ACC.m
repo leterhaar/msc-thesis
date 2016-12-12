@@ -125,7 +125,7 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
             agents(i).initial_deltas = deltas(((i-1)*Nm)+1:min(i*Nm,N), :);
         end
         
-        [agents.iterations] = deal(struct(  'J', nan, ...
+        [agents.iterations] = deal(struct(  'J', f(options.x0), ...
                                             'active_deltas', [],...
                                             'x', options.x0, ...
                                             'time', nan));
@@ -170,7 +170,7 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
                     assign(x_sdp, agents(i).iterations(k).x);
                     assign(delta_sdp, L(j, :));
                     residuals = check(constraints);
-                    if any(residuals < -1e-6);
+                    if any(residuals < -1e-4);
                         feasible_for_all = 0;
                     end
                     
@@ -188,25 +188,27 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
                     agents(i).iterations(k+1).J = f(next_x);
                     
                     
-                    % store active constraints
-                    agents(i).iterations(k+1).active_deltas = [];
-                    for j = 1:size(L,1)
-                         % check feasibility of new set of constraints
-                        assign(x_sdp, next_x);
-                        assign(delta_sdp, L(j, :));
-                        residuals = check(constraints);
-                        if any(residuals < 1e-6 & residuals > -1e-6);
-                            agents(i).iterations(k+1).active_deltas = [
-                                agents(i).iterations(k+1).active_deltas;
-                                L(j, :)];
-                        end
-                    end
+                    
                 else
                     agents(i).iterations(k+1).x = ...
                                                 agents(i).iterations(k).x;
                     agents(i).iterations(k+1).J = ...
                                                 agents(i).iterations(k).J;
 
+                end
+                
+                % store active constraints
+                agents(i).iterations(k+1).active_deltas = [];
+                for j = 1:size(L,1)
+                     % check feasibility of new set of constraints
+                    assign(x_sdp, agents(i).iterations(k+1).x);
+                    assign(delta_sdp, L(j, :));
+                    residuals = check(constraints);
+                    if any(residuals < 1e-6 & residuals > -1e-6);
+                        agents(i).iterations(k+1).active_deltas = [
+                            agents(i).iterations(k+1).active_deltas;
+                            L(j, :)];
+                    end
                 end
                 
                 % check if J(t+1) is J(t)

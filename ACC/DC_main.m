@@ -122,6 +122,7 @@ end
     
 %%
 % calculate central solution
+total_scenario_constraints = length(C_all);
 C_all = [C_all, DC_f_0(x, dc, wind, t_wind)];
 Obj = DC_f_obj(x, dc, wind, t_wind);
 
@@ -167,6 +168,7 @@ for ag = 1:m
 end
 
 % check feasibility
+DC_active_constraints = nan(m,t);
 feas = nan(m, t);
 for ag = 1:m
     for k = 1:t
@@ -176,6 +178,7 @@ for ag = 1:m
             total_violated = total_violated + sum(res < -1e-6);
         end
         feas(ag, k) = total_violated / (N_j*N) * 100;
+        DC_active_constraints(ag, k) = size(agents(ag).A{k}, 1);
     end
 end
 
@@ -211,23 +214,27 @@ xlabel('Iteration');
 
 % build problem
 x_sdp = sdpvar(5*dc.N_G,1, 'full');
-delta_sdp = sdpvar(1,2, 'full');
+delta_sdp = sdpvar(1,3, 'full');
 f = @(x) DC_f_obj(x, dc, wind, t_wind);
 default_constraint = DC_f_0(x_sdp, dc, wind, t_wind);
 constraints_delta = DC_f_ineq_delta(x_sdp, delta_sdp, dc, t_wind);
-opt_settings = sdpsettings('verbose', 2, 'solver', 'gurobi');
+opt_settings = sdpsettings('verbose', 0, 'solver', 'gurobi');
 %%
 % build deltas
-deltas = [wind.P_w(t_wind, :)' wind.P_m(t_wind, :)'];
-deltas = zeros(0,2);
+deltas = [];
+for i = 1:N
+    deltas = [deltas; wind.P_w(t_wind, i), ...
+                  max(0, -wind.P_m(t_wind, i)), ...
+                  max(0, wind.P_m(t_wind, i))];
+end
 [xstar_acc, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints_delta, ...
-                          'verbose', 1, ...
+                          'verbose', 0, ...
                           'default_constraint', default_constraint, ...
                           'n_agents', m,...
                           'diameter', dm,...
                           'debug', 1,...
                           'opt_settings', opt_settings,...
-                          'max_its', 10);
+                          'max_its', 20);
 
                       
 %% calculate convergence and feasibility
@@ -238,6 +245,7 @@ convergence = nan(K,m);
 feasibility = nan(K,m);
 time_per_iteration = nan(K,m);
 optimal_objective = f(xstar_centralized);
+ACC_active_deltas = nan(K,m);
 p = progress('Checking constraints', m);
 for i = 1:m
     for k = 1:K
@@ -247,20 +255,24 @@ for i = 1:m
         
         % calculate feasibility percentage
         assign(x, agents(i).iterations(k).x)
-        feasibility(k,i) = sum(check(C_all) < -1e-6) / N * 100;
+        feasibility(k,i) = sum(check(C_all) < -1e-5) / N * 100;
         
         % store times
         time_per_iteration(k,i) = agents(i).iterations(k).time;
+        
+        % store no of constraints
+        ACC_active_deltas(k,i) = ...
+                            size(agents(i).iterations(k).active_deltas, 1);
     end
     p.ping();
 end
 
 %% plot
 initfig('ACC iterations', 1);
-ax = subplot(211, 'YScale', 'log');
-grid on
-hold on
+ax = subplot(211);
+hold off
 plot(convergence);
+grid on
 ylabel('|f(x_k^i) - f(x^*) |')
 title('Convergence');
 
@@ -274,3 +286,13 @@ xlabel('iterations');
 
 initfig('ACC timing', 2);
 plot(time_per_iteration);
+
+initfig('Activeness', 3);
+yyaxis left
+plot([zeros(1, m); DC_active_constraints']);
+hold on
+plot(repmat(total_scenario_constraints, xlim))
+yyaxis right
+plot(ACC_active_deltas);
+hold on
+plot(repmat(N, xlim));

@@ -1,11 +1,6 @@
 % create SVM problem
 addpath('../formulation_SVM');
 
-d = 100;     % dimension of problem
-N = 2000;    % number of constraints
-m = 20;      % number of agents
-
-svm = create_SVM(d,N);
 opt_settings = sdpsettings('verbose', 0, 'solver', 'gurobi');
 
 % run algorithm
@@ -14,7 +9,7 @@ opt_settings = sdpsettings('verbose', 0, 'solver', 'gurobi');
                    'debug', 1, ...
                    'opt_settings', opt_settings,...
                    'n_agents', m, ...
-                   'diameter', 3);
+                   'diameter', 2);
 %% calculate convergence and feasibility
 m = length(agents);
 K = length(agents(1).iterations);
@@ -60,5 +55,5 @@ xlabel('iterations');
 initfig('ACC timing', 2);
 plot(time_per_iteration);
 
-assert(all_close(xstar, svm.Bstar, 1e-5), 'Not close');
+assert(all_close(xstar, svm.Bstar, 1e-4), 'Not close');
 assert(sum(feasibility(k,:)) == 0, 'Not all feasible');

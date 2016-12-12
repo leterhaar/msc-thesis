@@ -3,11 +3,8 @@ clear
 yalmip('clear');
 addpath('../formulation_SVM');
 
-d = 100;     % dimension of problem
-N = 200;    % number of constraints
-m = 5;      % number of agents
+m_svm = 5;      % number of agents
 
-svm = create_SVM(d,N);
 opt_settings = sdpsettings('verbose', 0, 'solver', 'gurobi');
 
 % run algorithm
@@ -15,17 +12,17 @@ opt_settings = sdpsettings('verbose', 0, 'solver', 'gurobi');
                    'verbose', 1,...
                    'debug', 1, ...
                    'opt_settings', opt_settings,...
-                   'n_agents', m);
+                   'n_agents', m_svm);
 %% calculate convergence and feasibility
-m = length(agents);
+m_svm = length(agents);
 K = length(agents(1).iterations);
 
-convergence = nan(K,m);
-feasibility = nan(K,m);
-time_per_iteration = nan(K,m);
+convergence = nan(K,m_svm);
+feasibility = nan(K,m_svm);
+time_per_iteration = nan(K,m_svm);
 optimal_objective = svm.f(svm.Bstar);
-p = progress('Checking constraints', m);
-for i = 1:m
+p = progress('Checking constraints', m_svm);
+for i = 1:m_svm
     for k = 1:K
         % calculate difference with centralized objective
         convergence(k,i) = abs(agents(i).iterations(k).J ...
@@ -33,7 +30,7 @@ for i = 1:m
         
         % calculate feasibility percentage
         assign(svm.B, agents(i).iterations(k).x)
-        feasibility(k,i) = sum(check(svm.cons) < -1e-6) / N * 100;
+        feasibility(k,i) = sum(check(svm.cons) < -1e-6) / N_svm * 100;
         
         % store times
         time_per_iteration(k,i) = agents(i).iterations(k).time;
@@ -48,7 +45,7 @@ grid on
 hold on
 plot(convergence);
 ylabel('|f(x_k^i) - f(x^*) |')
-title(sprintf('ACC convergence for SVM with d=%i, m=%i', d, N));
+title(sprintf('ACC convergence for SVM with d=%i, m=%i', d, N_svm));
 
 ax2 = subplot(212);
 linkaxes([ax ax2], 'x');

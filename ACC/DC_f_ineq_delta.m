@@ -1,7 +1,7 @@
 function C = DC_f_ineq_delta(x, delta, dc, t_wind)
 % C = DC_f_ineq_delta(x, delta, dc, t_wind)
 %
-% delta(1) = Pw, delta(2) = Pm
+% delta(1) = Pw, delta(2) = max(0, -Pm), delta(3) = max(0, Pm)
 % Function to create a constraint set based on a scenario
 
     PG_idx = 1:dc.N_G;
@@ -11,7 +11,7 @@ function C = DC_f_ineq_delta(x, delta, dc, t_wind)
     dds_idx = 4*dc.N_G+1:5*dc.N_G;
     
     % define reserve power
-    R = x(dus_idx) * max(0, -delta(2)) - x(dds_idx) * max(0, delta(2));                
+    R = x(dus_idx) * delta(2) - x(dds_idx) * delta(3);                
                 
                 
     % define scenario power injection vector

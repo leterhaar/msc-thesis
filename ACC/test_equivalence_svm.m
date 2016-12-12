@@ -1,9 +1,5 @@
 % test equivalence between optimizer and optimize command for svm problem
 
-% create SVM problem
-m = 100;
-d = 20;
-svm = create_SVM(d,m);
 opt_settings = sdpsettings('verbose', 0, 'solver', 'gurobi');
 
 Obj = svm.f(svm.B);
@@ -14,7 +10,7 @@ for i = 1:5
     
     res1 = check(svm.cons);
     res2 = [];
-    for j = 1:m
+    for j = 1:N_svm
         assign(svm.delta, svm.deltas(j, :))
         res2 = [res2; check(svm.cons_delta)];
     end
@@ -30,13 +26,13 @@ xstar1 = value(svm.B);
 % solve optimization problem using optimizer
 solvert = optimizer(svm.cons_delta, Obj, opt_settings, svm.delta, svm.B);
 merged = [];
-for i = 1:m
+for i = 1:N_svm
     merged = [merged, solvert(svm.deltas(i, :), 'nosolve')];
 end
 [xstar2, problem, msg] = merged([]);
 assert(not(problem), msg);
 assign(svm.B, xstar2);
-for i = 1:m
+for i = 1:N_svm
     assign(svm.delta, svm.deltas(i, :))
     assert(all(check(svm.cons_delta) > -1e-6), 'Not feasible');
 end

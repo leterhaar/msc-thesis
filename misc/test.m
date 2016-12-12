@@ -12,7 +12,7 @@ function test(name)
                 test_sequence = {name};
             end
 
-            for i = 1:length(test_sequence)
+            for i = randperm(length(test_sequence))
                 all_ok = 1;
                 scriptname = sprintf('test_%s', test_sequence{i});
                 fprintf('Running %s\n   ', scriptname)
