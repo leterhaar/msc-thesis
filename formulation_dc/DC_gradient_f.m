@@ -2,8 +2,16 @@ function grad = DC_gradient_f(x, dc, wind)
 % grad = DC_gradient_f(x, dc, wind)
 % returns the value of the objective function
 
-    grad = zeros_like(x);
+    
+    
     N_t = size(wind.P_m, 1);
+    
+    % reshape x if it is a column vector
+    if size(x, 2) == 1
+        x = reshape(x, 5*dc.N_G, N_t);
+    end
+    
+    grad = zeros_like(x);
     
     % get indices for x
     Rus_idx = dc.N_G+1:2*dc.N_G;

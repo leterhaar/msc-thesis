@@ -1,4 +1,5 @@
 function C = DC_cons_det(x, dc, wind)
+% DC_cons_det(x, dc, wind)
 % returns the deterministic constraints
 
     PG_idx = 1:dc.N_G;
@@ -9,6 +10,12 @@ function C = DC_cons_det(x, dc, wind)
 
     C = [];
     N_t = size(wind.P_m, 1);
+    
+    % reshape x if it is a column vector
+    if size(x, 2) == 1
+        x = reshape(x, 5*dc.N_G, N_t);
+    end
+    
     for t = 1:N_t
 
         % define deterministic power injection vector  

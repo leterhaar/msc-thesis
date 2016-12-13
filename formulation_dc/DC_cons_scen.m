@@ -14,6 +14,11 @@ function C = DC_cons_scen(x, dc, wind)
 
     [N_t, N] = size(wind.P_m);
     
+    % reshape x if it is a column vector
+    if size(x, 2) == 1
+        x = reshape(x, 5*dc.N_G, N_t);
+    end
+    
     for i = 1:N
         for t = 1:N_t
             

@@ -1,29 +1,29 @@
-function [residuals, labels] = DC_g(x, dc, wind, j_des)
-%  [residuals, labels] = DC_g(x, dc, wind, j_des)
-% Calculates constraint function for one scenario
+function [residuals, labels] = DC_g_delta(x, dc, delta, j_des)
+%  [residuals, labels] =  DC_g_delta(x, dc, delta, j_des)
+% Calculates residuals for a delta
+% delta has the form [P_w1 ... PwN P_mp1 ... P_mpN P_mn1 ... P_mnN]
+% where P_mp = max(0, P_m) and P_mn = max(0, -P_m)
     
     if nargin < 4
         j_des = 0;
     end
     
-    assert(size(wind.P_m, 2) == 1, 'Can only handle one scenario');
-
     % get indices for x
     PG_idx = 1:dc.N_G;
     Rus_idx = dc.N_G+1:2*dc.N_G;
     Rds_idx = 2*dc.N_G+1:3*dc.N_G;
     dus_idx = 3*dc.N_G+1:4*dc.N_G;
     dds_idx = 4*dc.N_G+1:5*dc.N_G;
-       
+
     % get sizes
     N_j = 4*dc.N_G + 2*dc.N_l;
-    N_t = size(wind.P_m, 1);
-    
+    N_t = length(delta)/3;
+
     % reshape x if it is a column vector
     if size(x, 2) == 1
         x = reshape(x, 5*dc.N_G, N_t);
     end
-    
+
     % preallocate residual vector
     if isa(x, 'sdpvar')
         residuals = sdpvar(N_t*N_j, 1);
@@ -37,14 +37,16 @@ function [residuals, labels] = DC_g(x, dc, wind, j_des)
     j = 1;
     for t = 1:N_t
 
-        % define reserve power
-        R = x(dus_idx, t) * max(0, -wind.P_m(t)) ...
-                        - x(dds_idx, t) * max(0, wind.P_m(t));                
+        % define reserve power (negative mismatch starts from 2N_tt, positive
+        % from N_t
+                            
+        R = x(dus_idx, t) * delta(2*N_t+t) ...
+                        - x(dds_idx, t) * delta(N_t+t);                
 
 
         % define scenario power injection vector
         P_injs = dc.C_G * (x(PG_idx, t) + R) ...
-                  + dc.C_w * wind.P_w(t) - dc.P_D(t, :)';
+                  + dc.C_w * delta(t) - dc.P_D(t, :)';
 
         for k = 1:dc.N_G   
 
