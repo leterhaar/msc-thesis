@@ -4,7 +4,7 @@ dc = DC_model('case14a');
 dc.set_WPG_bus(9);
 N = 10;
 wind = wind_model(dc, 24, 0.2);
-wind.dummy(10);
+wind.generate(N);
 N_t = 24;
 
 x = sdpvar(5*dc.N_G,N_t);
@@ -18,7 +18,7 @@ for i = 1:N
 end
 
 diagnostics = optimize(C, Obj, sdpsettings('verbose', 0));
-assert(not(diagnostics.problem), 'Problem optimizing');
+assert(not(diagnostics.problem), diagnostics.info);
 xstar = value(x);
 
 test_sequence = {...

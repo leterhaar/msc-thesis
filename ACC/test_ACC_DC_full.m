@@ -9,13 +9,13 @@ if not(exist('DC_f', 'file'))
 end
     
 % create network and wind models
-N = 10;
+N = 50;
 dc = DC_model('case14a');
 dc.set_WPG_bus(9);
 wind = wind_model(dc, 24, 0.2);
 wind.generate(N);
 
-opt_settings = sdpsettings('solver', 'gurobi', 'verbose', 0);
+opt_settings = sdpsettings('solver', 'gurobi', 'verbose', 2);
 n_agents = 5;
 diam = 2;
 x_sdp_full = sdpvar(5*dc.N_G, 24);
@@ -31,7 +31,7 @@ residuals = @(x, delta, j) DC_g_delta(x, dc, delta, j);
 %% run ACC algorithm
 
 [xstar, agents] = ACC(x_sdp_full, delta_sdp, deltas, f, constraints, ...
-                      'verbose', 1,...
+                      'verbose', 0,...
                       'opt_settings', opt_settings,...
                       'default_constraint', default_constraint,...
                       'diameter', diam,...

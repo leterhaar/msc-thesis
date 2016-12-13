@@ -17,7 +17,7 @@ function [residuals, labels] = DC_g_delta(x, dc, delta, j_des)
 
     % get sizes
     N_j = 4*dc.N_G + 2*dc.N_l;
-    N_t = size(delta, 2)/3;
+    N_t = length(delta)/3;
 
     % reshape x if it is a column vector
     if size(x, 2) == 1

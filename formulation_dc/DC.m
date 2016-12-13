@@ -1,5 +1,6 @@
 addpath('../wind');
 addpath('../misc');
+addpath('../networks');
 
 figure(1);
 set(1, 'name', 'Network');
@@ -10,25 +11,27 @@ set(2, 'name', 'Wind');
 dock
 
 %%
-dc = DC_model('case14');
+dc = DC_model('case14a');
 dc.set_WPG_bus(9);
-dc.draw_network();
-dc.c_us(4) = 5;
 
-epsilon = 5e-2;                         % violation parameter
-zeta = 5*dc.N_G;                        % Helly-dimsension
-beta = 1e-5;                            % confidence parameter
-
-% determine number of scenarios to generate based on Eq (2-4)
-N_orig = ceil(2/epsilon*(zeta-1+log(1/beta)));
-wind_orig = wind_model(dc, 24, 0.2);
-wind_orig.generate(N_orig);
+% epsilon = 5e-2;                         % violation parameter
+% zeta = 5*dc.N_G;                        % Helly-dimsension
+% beta = 1e-5;                            % confidence parameter
+% 
+% % determine number of scenarios to generate based on Eq (2-4)
+% N_orig = ceil(2/epsilon*(zeta-1+log(1/beta)));
+% wind_orig = wind_model(dc, 24, 0.2);
+% wind_orig.generate(N_orig);
 %%
 t = 5;
-wind = copy(wind_orig);
-wind.use_extremes(t);
-N = 2;
-wind_orig.plot(t);
+% wind = copy(wind_orig);
+% wind.use_extremes(t);
+% N = 2;
+% wind_orig.plot(t);
+
+wind = wind_model(dc, 24, 0.2);
+wind.generate(1);
+N = 1;
 
 P_G = sdpvar(dc.N_G, 1, 'full');       % real power production 
 R_us = sdpvar(dc.N_G, 1, 'full');      % upspinning reserve requirement
@@ -107,6 +110,8 @@ decision_vars = {P_G, R_us, R_ds, d_us, d_ds};
 %% Optimize
 opt = sdpsettings('verbose', 0);
 diagnostics = optimize(Cons, Obj, opt);
+assert(not(diagnostics.problem), diagnostics.info);
+
 
 %% Evaluate and show
 PG_opt = value(P_G);
