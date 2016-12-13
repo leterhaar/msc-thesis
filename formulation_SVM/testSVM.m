@@ -30,8 +30,8 @@ end
 
 function testResiduals(testCase)
     svm = testCase.TestData.svm;
-    d = testCase.TestData.d;
-    m = testCase.TestData.m;
+    d = svm.d;
+    m = svm.m;
     newB = svm.Bstar;
     newB(randperm(d,ceil(d/10))) = rand(ceil(d/10), 1);
 
@@ -47,6 +47,18 @@ function testResiduals(testCase)
 
     verifyEqual(testCase, residuals1, residuals2, 'RelTol', 1e-10);
     verifyEqual(testCase, residuals1, residuals3', 'RelTol', 1e-10);
+end
+
+function testConstraintsAsFunction(testCase)
+    % the residuals must also work for a function
+    svm = testCase.TestData.svm;
+    randB = rand(svm.d, 1);
+    residuals = nan(svm.m,1);
+    for i = 1:svm.m
+        residuals(i) = svm.residual_delta(randB, svm.deltas(i,:));
+    end
+    assign(svm.B, randB);
+    verifyEqual(testCase, residuals, check(svm.cons), 'RelTol', 1e-10); 
 end
 
 function teardownOnce(testCase)  % do not change function name

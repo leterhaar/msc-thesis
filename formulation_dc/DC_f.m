@@ -2,8 +2,15 @@ function Obj = DC_f(x, dc, wind)
 % Obj = DC_f(x, dc, wind)
 % returns the value of the objective function
 
-    Obj = 0;
     N_t = size(wind.P_m, 1);
+    
+    % reshape x if it is a column vector
+    if size(x, 2) == 1
+        x = reshape(x, 5*dc.N_G, N_t);
+    end
+    
+    Obj = 0;
+
     
     % loop over time
     for t = 1:N_t

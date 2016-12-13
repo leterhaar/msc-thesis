@@ -23,6 +23,12 @@
 %  - debug      : enter debugging inside function on error (default 0)
 %  - x0         : initial value for x (if empty, zeros)
 %  - max_its    : maximum no of iterations (default 100)
+%  - residuals  : function handle to evaluate residuals h(x,delta) >= 0
+%                 optional, when empty the check function of yalmip will be
+%                 used
+%  - use_selector : boolean to indicate that the constraint function
+%                   accepts a third argument h(x, delta, j) >= 0 for
+%                   selection
 %
 % RETURNS
 % =======
@@ -56,7 +62,9 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
                      'diameter', 3, ...
                      'debug', 0, ...
                      'n_agents', [],...
-                     'max_its', 100);
+                     'max_its', 100, ...
+                     'residuals', [],...
+                     'use_selector', false);
     def_fields = fieldnames(options);
     
     % load options from varargin
@@ -175,18 +183,36 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
                 % build solver
                 merged = [];
                 feasible_for_all = 1;
+
                 for j = 1:size(L,1)
                     
                     % check feasibility of new set of constraints
-                    assign(x_sdp, agents(i).iterations(k).x);
-                    assign(delta_sdp, L(j, 2:end));
-                    residuals = check(constraints(L(j, 1)));
-                    if any(residuals < -1e-4);
+                    if isempty(options.residuals) % use YALMIP check
+                        assign(x_sdp, agents(i).iterations(k).x);
+                        assign(delta_sdp, L(j, 2:end));
+                        residual = check(constraints(L(j, 1)));
+                        
+                    elseif options.use_selector % use h(x, delta, j) >= 0
+                        residual = options.residuals(...
+                                                agents(i).iterations(k).x, ...
+                                                L(j, 2:end), L(j, 1));
+                                            
+                    else % use residual function h(x, delta) >= 0
+                        % get all residuals
+                        residuals = options.residuals(...
+                                                agents(i).iterations(k).x, ...
+                                                L(j, 2:end));
+                        % filter out the residual of interest
+                        residual = residuals(L(j,1));
+                    end
+                    
+                    if residual < -1e-6;
                         feasible_for_all = 0;
                     end
                     
                     % merge the solvers with filled deltas together
                     merged = [merged; the_solver(L(j,2:end), 'nosolve')];
+
                 end
                 
                 if not(feasible_for_all) || k == 1
@@ -211,11 +237,28 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
                 % store active constraints
                 agents(i).iterations(k+1).active_deltas = [];
                 for j = 1:size(L,1)
-                     % check feasibility of new set of constraints
-                    assign(x_sdp, agents(i).iterations(k+1).x);
-                    assign(delta_sdp, L(j, 2:end));
-                    residuals = check(constraints(L(j, 1)));
-                    if any(residuals < 1e-6 & residuals > -1e-6);
+                    
+                    % check feasibility of of the new solution
+                    if isempty(options.residuals) % use YALMIP check
+                        assign(x_sdp, agents(i).iterations(k).x);
+                        assign(delta_sdp, L(j, 2:end));
+                        residual = check(constraints(L(j, 1)));
+                        
+                    elseif options.use_selector % use h(x, delta, j) >= 0
+                        residual = options.residuals(...
+                                                agents(i).iterations(k).x, ...
+                                                L(j, 2:end), L(j, 1));
+                                            
+                    else % use residual function h(x, delta) >= 0
+                        % get all residuals corresponding to the delta
+                        residuals = options.residuals(...
+                                                agents(i).iterations(k).x, ...
+                                                L(j, 2:end));
+                        % filter out the residual of interest
+                        residual = residuals(L(j,1));
+                    end
+
+                    if residual < 1e-6 && residual > -1e-6;
                         agents(i).iterations(k+1).active_deltas = [
                             agents(i).iterations(k+1).active_deltas;
                             L(j, :)];

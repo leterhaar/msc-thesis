@@ -9,6 +9,11 @@ function flag = DC_check(x, dc, wind)
     tol = 1e-6;
     [N_t, N] = size(wind.P_m);
     
+    % reshape x if it is a column vector
+    if size(x, 2) == 1
+        x = reshape(x, 5*dc.N_G, N_t);
+    end
+    
     % check deterministic constraints
     x_sdp = sdpvar(5*dc.N_G, N_t, 'full');
     C_det = DC_cons_det(x_sdp, dc, wind);

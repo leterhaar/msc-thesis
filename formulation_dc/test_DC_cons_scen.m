@@ -21,9 +21,12 @@ for j = random_j
 end
 
 %% test equivalence with faster notation
+C2 = [];
+for i = 1:N
+    C2 = [C2, DC_cons_scen2(x, dc, wind.slice(i))];
+end
 
-C2 = DC_cons_scen(x, dc, wind);
-
+C_det = DC_cons_det(x, dc, wind);
 info = optimize([C_det, C2], Obj, sdpsettings('verbose', 0));
 assert(not(info.problem), sprintf('Problem optimizing: %s', info.info));
 

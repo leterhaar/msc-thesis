@@ -38,6 +38,8 @@ function prob = create_SVM(d, m)
         prob.ys = ys(shuffled_ids);
         prob.B = sdpvar(d,1,'full');
         prob.delta = sdpvar(1, d+1);
+        prob.d = d;
+        prob.m = m;
 
         % define constraints
         prob.cons = [];
@@ -53,6 +55,7 @@ function prob = create_SVM(d, m)
         prob.grad_f = @(B) B;
         prob.residual = @(B,i) prob.ys(i) * prob.xs(:, i)' * B - 1;
         prob.residuals = @(B) arrayfun(@(i) prob.ys(i) * prob.xs(:, i)' * B - 1, 1:m);
+        prob.residual_delta = @(B,delta) delta(1) * delta(2:end) * B - 1;
 
         
         % solve problem and store optimal value

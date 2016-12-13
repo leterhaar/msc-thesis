@@ -24,9 +24,9 @@ ax = gca;
 % ax.YLabel.FontSize = 18;
 set(h, 'defaultLineLineWidth', 2)
 title(name);
-
-assignin('base', 'blue', [36 55 58]/255);
-assignin('base', 'green', [128 205 193]/255); 
-assignin('base', 'orange', [235 128 27]/255);
-assignin('base', 'brown', [191 128 64]/255);	
+% 
+% assignin('base', 'blue', [36 55 58]/255);
+% assignin('base', 'green', [128 205 193]/255); 
+% assignin('base', 'orange', [235 128 27]/255);
+% assignin('base', 'brown', [191 128 64]/255);	
 end
