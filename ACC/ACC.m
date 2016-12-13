@@ -124,7 +124,12 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
             addpath('../misc');
         end
 
-        connectivity_graph = random_graph(m,options.diameter, 'rand');
+        if not(exist('digraph', 'file'))
+            warning('Digraph function not found, using G from workspace');
+            connectivity_graph = evalin('base', 'G');
+        else 
+            connectivity_graph = random_graph(m,options.diameter, 'rand');
+        end
         
         %% initialize agents
         agents = struct('initial_deltas', [], ...
