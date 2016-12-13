@@ -145,7 +145,7 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
             delta_slice = deltas(((i-1)*Nm)+1:min(i*Nm,N), :);
             identifiers = repmat(constraint_ids, size(delta_slice, 1), 1);
             agents(i).initial_deltas = [identifiers, ...
-                                        repelem(delta_slice, Ncons, 1)];
+                                        kron(delta_slice, ones(Ncons, 1))];
                 
         end
         
