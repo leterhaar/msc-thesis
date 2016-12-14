@@ -36,7 +36,7 @@
 % xstar         : optimal value for x after convergence
 % agents        : structure with iterations
 
-function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargin)
+function [xstar, agents] = AACC(x_sdp, delta_sdp, deltas, f, constraints, varargin)
     %% check validity of input and load options
     % check types of input
     assert(isa(x_sdp, 'sdpvar'), 'x_sdp should be sdpvar');
@@ -168,33 +168,10 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
                                             'x', options.x0, ...
                                             'time', nan));
                   
-        %% precompile solvers for every constraint in the set
-        cons_solvers = cell(Ncons, 1);
-        if verbose
-            p = progress('Compiling solvers', Ncons);
-        end
-        
-%         % the solver with default constraints
-%         default_solver = optimizer(options.default_constraint, ...
-%                                    f(x_sdp), options.opt_settings, ...
-%                                    delta_sdp, x_sdp);
-%                                
-%         if verbose
-%             p.ping();
-%         end
-        
-        % define a solver for every type of constraint in constraint set
-        for i = 1:Ncons
-            cons_solvers{i} = optimizer([options.default_constraint, ...
-                                         constraints(i)], f(x_sdp), ...
-                                        options.opt_settings, delta_sdp, ...
-                                        x_sdp);
-                                    
-            if verbose
-                p.ping();
-            end
-        end
-                       
+        % precompile solver
+        the_solver = optimizer([options.default_constraint, constraints], ...
+                                f(x_sdp), options.opt_settings, delta_sdp, x_sdp);
+                        
         %% start main iterations
         k = 1;
         ngc = ones(m, 1);
@@ -215,15 +192,19 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
                      agents(i).iterations(k).active_deltas];
                  
                 % ... and A_j for all incoming agents j
+                N_incoming = sum(connectivity_graph(:,i));
+                z = zeros_like(x_sdp);
                 for j = find(connectivity_graph(:, i))';
                     L = [L; agents(j).iterations(k).active_deltas];
+                    
+                    % sum up incoming xs devided by number of connections
+                    z = z + (agents(j).iterations(k).x ./ N_incoming);
                 end
 
                 % filter out double deltas
                 L = unique(L, 'rows');
                 
                 % build solver
-                merged = []; 
                 feasible_for_all = 1;
 
                 for j = 1:size(L,1)
@@ -250,18 +231,48 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
                     
                     if residual < -1e-6;
                         feasible_for_all = 0;
-                        break;
+                        break
                     end
-
+                    
                 end
                 
                 if not(feasible_for_all) || k == 1
+                    
                     merged = [];
-                    % merge the solvers with filled deltas together
+                    N_cons = 0;
+
                     for j = 1:size(L,1)
-                        merged = [merged; cons_solvers{L(j,1)}(L(j,2:end), ...
+                        
+                        % check feasibility for z instead of x
+                        if isempty(options.residuals) % use YALMIP check
+                            assign(x_sdp, z);
+                            assign(delta_sdp, L(j, 2:end));
+                            residual = check(constraints(L(j, 1)));
+
+                        elseif options.use_selector % use h(x, delta, j) >= 0
+                            residual = options.residuals(...
+                                                    z, ...
+                                                    L(j, 2:end), L(j, 1));
+
+                        else % use residual function h(x, delta) >= 0
+                            % get all residuals
+                            residuals = options.residuals(...
+                                                    z, ...
+                                                    L(j, 2:end));
+                            % filter out the residual of interest
+                            residual = residuals(L(j,1));
+                        end
+
+                        % only merge the solvers with infeasible deltas
+                        if residual < -1e-6
+                            merged = [merged; ...
+                                      cons_solvers{L(j,1)}(L(j,2:end), ...
                                                                'nosolve')];
+                            N_cons = N_cons + 1;
+                        end
+        
                     end
+                    
 
                     % solve
                     [next_x, problem, msg] = merged([]);
@@ -273,7 +284,7 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
                     % store status
                     if debug
                         agents(i).iterations(k+1).info.optimized = 1;
-                        agents(i).iterations(k+1).info.num_cons = size(L,1);
+                        agents(i).iterations(k+1).info.num_cons = N_cons;
                     end
                     
                 else
@@ -348,9 +359,10 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
         % check if everything went well
         for i = 1:m
             for j = i+1:m
-                assert(all_close(agents(i).iterations(k).x, ...
-                                 agents(j).iterations(k).x, 1e-3), ...
-                                 'agents not close'); 
+                if not(all_close(agents(i).iterations(k).x, ...
+                                 agents(j).iterations(k).x, 1e-3))
+                   warning('Not all agents are close... might not have convergence');
+                end
             end
         end
         

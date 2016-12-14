@@ -14,7 +14,7 @@ function setupOnce(testCase)
     
     % create network and wind models
     testCase.TestData.N = 10;
-    dc = DC_model('case9');
+    dc = DC_model('case14a');
     dc.set_WPG_bus(9);
     wind = wind_model(dc, 24, 0.2);
     wind.generate(testCase.TestData.N);
@@ -101,7 +101,7 @@ function testSolvableWithSliceOfScenarios(testCase)
         
         cons = C_det;
         for i = 1:m
-            cons = [cons, DC_cons_scen(x_sdp, dc, wind.slice(i))];
+            cons = [cons, DC_cons_scen_single(x_sdp, dc, wind.slice(i))];
         end
         status = optimize(cons, Obj, ops);
         verifyTrue(testCase, not(status.problem), ...
@@ -169,6 +169,11 @@ function testSameSolution(testCase)
     
 end
 
+function testOldvsNew(testCase)
+
+    
+
+end
 
 
 

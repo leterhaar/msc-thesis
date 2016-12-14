@@ -1,6 +1,8 @@
 function test(name)
 % init test variables
     yalmip('clear');
+    
+    % create testCase object for verification
     for file = dir'
         if strcmp(file.name,'test_init.m');
             path = strsplit(pwd, '/');

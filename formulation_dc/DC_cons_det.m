@@ -26,6 +26,7 @@ function C = DC_cons_det(x, dc, wind)
         C = [C, (ones(1, dc.N_b) * P_injf == 0):...
                                         sprintf('Power bal det t%2i', t)];
 
+                                    
         % generator limits
         C = [C, (dc.P_Gmin <= x(PG_idx, t) <= dc.P_Gmax):...
                                          sprintf('Gen lims det t%2i', t)];
@@ -41,5 +42,7 @@ function C = DC_cons_det(x, dc, wind)
 
         C = [C, (ones(1,dc.N_G)*x(dus_idx, t) == 1):sprintf('Balu t%2i',t), ...
                 (ones(1,dc.N_G)*x(dds_idx, t) == 1):sprintf('Bald t%2i',t)];
+            
+        
     end
 end

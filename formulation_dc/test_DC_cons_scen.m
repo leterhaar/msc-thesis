@@ -30,4 +30,4 @@ C_det = DC_cons_det(x, dc, wind);
 info = optimize([C_det, C2], Obj, sdpsettings('verbose', 0));
 assert(not(info.problem), sprintf('Problem optimizing: %s', info.info));
 
-assert(all_close(value(x), xstar), 'Not the same');
+assert(all_close(value(x), xstar, 1e-3), 'Not the same');
