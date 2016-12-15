@@ -139,9 +139,9 @@ classdef DC_model < handle
             obj.P_fmax = mpc.branch(:, 6);   % Line ratings [MVA]
             
             % if all maximum line ratings are 0, make the line rating
-            % unbounded (1000000000 MW)
+            % unbounded (1000 MW)
             if sum(obj.P_fmax) == 0
-                obj.P_fmax = 1e9 * ones(obj.N_l, 1);
+                obj.P_fmax = 1e3 * ones(obj.N_l, 1);
             end
 
             % Create load curve based on values from the cases

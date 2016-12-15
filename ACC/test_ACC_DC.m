@@ -28,7 +28,7 @@ xstar_centralized = value(x_sdp);
 
 % solve ACC algorithm
 [xstar_acc, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints_delta, ...
-                          'verbose', 0, ...
+                          'verbose', 1, ...
                           'default_constraint', default_constraint, ...
                           'n_agents', m,...
                           'debug', 1,...
@@ -44,6 +44,8 @@ feasibility = nan(K,m);
 time_per_iteration = nan(K,m);
 optimal_objective = f(xstar_centralized);
 ACC_active_deltas = nan(K,m);
+optimizations_run = zeros(K,1);
+
 for i = 1:m
     for k = 1:K
         % calculate difference with centralized objective
@@ -57,9 +59,17 @@ for i = 1:m
         % store times
         time_per_iteration(k,i) = agents(i).iterations(k).time;
         
-        % store no of constraints
-        ACC_active_deltas(k,i) = ...
+        
+        % store total number of iterations run
+        if k > 1
+            
+            % store no of constraints
+            ACC_active_deltas(k,i) = ...
                             size(agents(i).iterations(k).active_deltas, 1);
+            
+            optimizations_run(k) = optimizations_run(k) + ...
+                                    agents(i).iterations(k).info.optimized;
+        end
     end
 end
 
@@ -81,7 +91,17 @@ ylabel('% violated');
 xlabel('iterations');
 
 initfig('ACC timing', 2);
+yyaxis left
 plot(time_per_iteration);
+ylabel('Time per iteration');
+yyaxis right
+plot(optimizations_run);
+ylabel('Optimizations run');
+
+initfig('ACC Active Deltas', 3);
+plot(ACC_active_deltas);
+plot(repmat(length(scenario_constraints), K, 1), '--')
+
 
 %% Make assertions
 assert(all_close(xstar_acc, xstar_centralized), 'Not the same');

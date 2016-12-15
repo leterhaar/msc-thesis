@@ -1,6 +1,8 @@
 addpath('../networks');
 addpath('../wind');
 addpath('../formulation');
+addpath('../formulation_SVM');
+addpath('../formulation_dc');
 
 N = 10;
 % create AC problem
@@ -20,11 +22,12 @@ delta_sdp = sdpvar(1,3, 'full');
 m = 4;
 
 % create SVM problem
-N_svm = 100;
-d = 20;
+N_svm = 200;
+d = 50;
 svm = create_SVM(d,N_svm);
- 
 test_sequence = {   'equivalence_svm', ...
                     'equivalence_solvers', ...
                     'ACC_SVM', ...
-                    'ACC_DC'};
+                    'ACC_DC'}; ...,...
+                    ...'ACC_DC_full',...
+                    ...'ACCA_SVM'};

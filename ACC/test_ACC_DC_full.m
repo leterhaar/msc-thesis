@@ -9,14 +9,14 @@ if not(exist('DC_f', 'file'))
 end
     
 % create network and wind models
-N = 50;
+N = 10;
 dc = DC_model('case14a');
 dc.set_WPG_bus(9);
 wind = wind_model(dc, 24, 0.2);
 wind.generate(N);
 
-opt_settings = sdpsettings('solver', 'gurobi', 'verbose', 1);
-n_agents = 5;
+opt_settings = sdpsettings('solver', 'gurobi', 'verbose', 0);
+n_agents = 3;
 diam = 2;
 x_sdp_full = sdpvar(5*dc.N_G, 24);
 delta_sdp = sdpvar(1, 3*24);
@@ -31,17 +31,19 @@ residuals = @(x, delta, j) DC_g_delta(x, dc, delta, j);
 %% run ACC algorithm
 
 [xstar, agents] = ACC(x_sdp_full, delta_sdp, deltas, f, constraints, ...
-                      'verbose', 0,...
+                      'verbose', 1,...
                       'opt_settings', opt_settings,...
                       'default_constraint', default_constraint,...
                       'diameter', diam,...
                       'n_agents', n_agents,...
-                      'debug', 1);
+                      'debug', 1,...
+                      'residuals', residuals,...
+                      'use_selector', true);
 
 %% run centralized problem
 C_scens = [];
 for i = 1:N
-    C_scens = [C_scens, DC_cons_scen(x_sdp_full, dc, wind.slice(i))];
+    C_scens = [C_scens, DC_cons_scen_single(x_sdp_full, dc, wind.slice(i))];
 end
 
 status = optimize([default_constraint, C_scens], f(x_sdp_full), opt_settings);
@@ -49,11 +51,12 @@ assert(not(status.problem), status.info);
 xstar_centralized = value(x_sdp_full);                  
 %% calculate convergence and feasibility
 K = length(agents(1).iterations);
-
+C_all = [default_constraint, C_scens];
 convergence = nan(K,n_agents);
 feasibility = nan(K,n_agents);
 time_per_iteration = nan(K,n_agents);
 optimal_objective = f(xstar_centralized);
+optimizations_run = zeros(K,1);
 ACC_active_deltas = nan(K,n_agents);
 for i = 1:n_agents
     for k = 1:K
@@ -71,14 +74,19 @@ for i = 1:n_agents
         % store no of constraints
         ACC_active_deltas(k,i) = ...
                             size(agents(i).iterations(k).active_deltas, 1);
+        
+        % store total number of iterations run
+        if k > 1
+            optimizations_run(k) = optimizations_run(k) + ...
+                                    agents(i).iterations(k).info.optimized;
+        end
     end
 end
 
 %% plot
 initfig('ACC iterations', 1);
-ax = subplot(211);
-hold off
-plot(convergence);
+ax = subplot(211, 'YScale', 'log');
+semilogy(convergence);
 grid on
 ylabel('|f(x_k^i) - f(x^*) |')
 title('Convergence');
@@ -94,6 +102,12 @@ xlabel('iterations');
 initfig('ACC timing', 2);
 plot(time_per_iteration);
 
+initfig('ACC Active Deltas', 3);
+plot(ACC_active_deltas);
+plot(repmat(length(C_scens), K, 1), '--')
+
+
+
 %% Make assertions
-assert(all_close(xstar_acc, xstar_centralized), 'Not the same');
+assert(all_close(xstar, xstar_centralized), 'Not the same');
 assert(sum(feasibility(end, :)) == 0, 'Not all feasible in the end');

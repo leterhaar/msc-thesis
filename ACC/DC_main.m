@@ -3,12 +3,13 @@ clear
 yalmip('clear');
 % add helper path
 addpath('../experiment');
-N = 10;
-m = 3;
+N = 100;
+m = 5;
 % init experiment
 init_experiment(...
     'model_name', 'case14a', ... adapted 14 bus network
     'model_formulation', 'DC', ...
+    'model_windbus', 9,...
     'wind_N', N, ... scenarios
     'wind_Nm', ceil(N/m), ... scenarios per agent
     'algorithm', 'ACC', ...
@@ -31,7 +32,7 @@ t = 1;
 infeasible = 0;
 
 % while not converged and still feasible
-while all(ngc < 2*dm+1) && not(infeasible)
+while any(ngc < 2*dm+1) && not(infeasible)
     prg = progress(sprintf('Iteration %i',t), m);
     
     % loop over agents
@@ -228,7 +229,7 @@ for i = 1:N
                   max(0, wind.P_m(t_wind, i))];
 end
 [xstar_acc, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints_delta, ...
-                          'verbose', 0, ...
+                          'verbose', 1, ...
                           'default_constraint', default_constraint, ...
                           'n_agents', m,...
                           'diameter', dm,...
@@ -288,11 +289,6 @@ initfig('ACC timing', 2);
 plot(time_per_iteration);
 
 initfig('Activeness', 3);
-yyaxis left
-plot([zeros(1, m); DC_active_constraints']);
-hold on
-plot(repmat(total_scenario_constraints, xlim))
-yyaxis right
+plot([zeros(1, m); DC_active_constraints'], '--');
 plot(ACC_active_deltas);
-hold on
-plot(repmat(N, xlim));
+plot(repmat(total_scenario_constraints, xlim), ':');
