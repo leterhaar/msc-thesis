@@ -59,11 +59,14 @@ for i = 1:m
         % store times
         time_per_iteration(k,i) = agents(i).iterations(k).time;
         
-        % store no of constraints
-        ACC_active_deltas(k,i) = ...
-                            size(agents(i).iterations(k).active_deltas, 1);
+        
         % store total number of iterations run
         if k > 1
+            
+            % store no of constraints
+            ACC_active_deltas(k,i) = ...
+                            size(agents(i).iterations(k).active_deltas, 1);
+            
             optimizations_run(k) = optimizations_run(k) + ...
                                     agents(i).iterations(k).info.optimized;
         end

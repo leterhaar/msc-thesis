@@ -47,7 +47,7 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
       isa(constraints, 'lmi'), 'constraints should be lmis');
   
     % store dimensions
-    d = size(x_sdp, 2);
+    d = size(x_sdp);
     [N, d_delta] = size(deltas);
     Ncons = length(constraints);
     
@@ -348,9 +348,10 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
         % check if everything went well
         for i = 1:m
             for j = i+1:m
-                assert(all_close(agents(i).iterations(k).x, ...
-                                 agents(j).iterations(k).x, 1e-3), ...
-                                 'agents not close'); 
+                if not(all_close(agents(i).iterations(k).x, ...
+                                 agents(j).iterations(k).x, 1e-3))
+                    warning('Agents not close, xstar may not be optimal'); 
+                end
             end
         end
         

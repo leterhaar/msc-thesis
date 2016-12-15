@@ -24,9 +24,19 @@ ax = gca;
 % ax.YLabel.FontSize = 18;
 set(h, 'defaultLineLineWidth', 2)
 title(name);
-% 
-% assignin('base', 'blue', [36 55 58]/255);
-% assignin('base', 'green', [128 205 193]/255); 
-% assignin('base', 'orange', [235 128 27]/255);
-% assignin('base', 'brown', [191 128 64]/255);	
+
+% Presentation colors
+% assignin('caller', 'blue', [36 55 58]/255);
+% assignin('caller', 'green', [128 205 193]/255); 
+% assignin('caller', 'orange', [235 128 27]/255);
+% assignin('caller', 'brown', [191 128 64]/255);	
+assignin('caller', 'blue', [0    0.4470    0.7410] );
+assignin('caller', 'green', [ 0.8500    0.3250    0.0980]); 
+assignin('caller', 'orange', [0.9290    0.6940    0.1250] );
+assignin('caller', 'brown', [ 0.4940    0.1840    0.5560]);	
+
+
+
+
+
 end

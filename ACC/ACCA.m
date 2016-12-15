@@ -30,6 +30,8 @@
 %                   accepts a third argument h(x, delta, j) >= 0 for
 %                   selection
 %  - connectivity : adjacency matrix of the connectivity graph
+%  - stepsize   : stepsize function handle of the form @(k) ...,          
+%                 default 1/(k+1)
 %
 % RETURNS
 % =======
@@ -47,7 +49,7 @@ function [xstar, agents] = ACCA(x_sdp, delta_sdp, deltas, f, constraints, vararg
       isa(constraints, 'lmi'), 'constraints should be lmis');
   
     % store dimensions
-    d = size(x_sdp, 2);
+    d = size(x_sdp);
     [N, d_delta] = size(deltas);
     Ncons = length(constraints);
     
@@ -66,7 +68,8 @@ function [xstar, agents] = ACCA(x_sdp, delta_sdp, deltas, f, constraints, vararg
                      'max_its', 100, ...
                      'residuals', [],...
                      'use_selector', false,...
-                     'connectivity', []);
+                     'connectivity', [],...
+                     'stepsize', @(k)1/(k+1));
     def_fields = fieldnames(options);
     
     % load options from varargin
@@ -174,20 +177,19 @@ function [xstar, agents] = ACCA(x_sdp, delta_sdp, deltas, f, constraints, vararg
             p = progress('Compiling solvers', Ncons+1);
         end
         
-        % the solver with default constraints
-        default_solver = optimizer(options.default_constraint, ...
-                                   f(x_sdp), options.opt_settings, ...
-                                   delta_sdp, x_sdp);
-                               
-        if verbose
-            p.ping();
-        end
-        
+        % define objective with consensus term
+        z_sdp = sdpvar(d(1), d(2), 'full');
+        alpha_sdp = sdpvar(1);
+        Obj_consensus = f(x_sdp) + ...
+                             1/(2*alpha_sdp) * norm(x_sdp(:) - z_sdp(:))^2;
+
         % define a solver for every type of constraint in constraint set
         for i = 1:Ncons
             cons_solvers{i} = optimizer([options.default_constraint,...
-                                        constraints(i)], f(x_sdp), ...
-                                        options.opt_settings, delta_sdp, ...
+                                        constraints(i)], ...
+                                        Obj_consensus, ...
+                                        options.opt_settings, ...
+                                        {delta_sdp, z_sdp, alpha_sdp}, ...
                                         x_sdp);
                                     
             if verbose
@@ -199,6 +201,7 @@ function [xstar, agents] = ACCA(x_sdp, delta_sdp, deltas, f, constraints, vararg
         k = 1;
         ngc = ones(m, 1);
         loop_active = 1;
+        
         while loop_active
             
             if verbose
@@ -214,10 +217,15 @@ function [xstar, agents] = ACCA(x_sdp, delta_sdp, deltas, f, constraints, vararg
                 L = [agents(i).initial_deltas; ...
                      agents(i).iterations(k).active_deltas];
                  
-                % ... and A_j for all incoming agents j
-                N_incoming = sum(connectivity_graph(:,i));
-                z = zeros_like(x_sdp);
+                % build consensus variable z from average of own solution +
+                % incoming constraints using constant weights a_*^i =
+                % 1/(N+1)
+                N_incoming = sum(connectivity_graph(:,i)) + 1;
+                z = agents(i).iterations(k).x ./ N_incoming;
+                
+                % loop over neighbouring agents
                 for j = find(connectivity_graph(:, i))';
+                    % add A_j for all incoming agents j to constraint set
                     L = [L; agents(j).iterations(k).active_deltas];
                     
                     % sum up incoming xs devided by number of connections
@@ -227,8 +235,7 @@ function [xstar, agents] = ACCA(x_sdp, delta_sdp, deltas, f, constraints, vararg
                 % filter out double deltas
                 L = unique(L, 'rows');
                 
-                % build solver
-                merged = []; 
+                % check feasibility of new set of constraints
                 feasible_for_all = 1;
 
                 for j = 1:size(L,1)
@@ -262,7 +269,9 @@ function [xstar, agents] = ACCA(x_sdp, delta_sdp, deltas, f, constraints, vararg
                 if not(feasible_for_all) || k == 1
                     
                     N_cons_used = 0;
-                    
+                    % build solver
+                    merged = []; 
+                    alpha = options.stepsize(k);
                     for j = 1:size(L,1)
                         
                         % check feasibility for z instead of x
@@ -288,8 +297,10 @@ function [xstar, agents] = ACCA(x_sdp, delta_sdp, deltas, f, constraints, vararg
                         % only merge the solvers with infeasible deltas
                         if residual < -1e-6
                             merged = [merged; ...
-                                      cons_solvers{L(j,1)}(L(j,2:end), ...
-                                                               'nosolve')];
+                                      cons_solvers{L(j,1)}({L(j,2:end),...
+                                                            z,...
+                                                            alpha},...
+                                                            'nosolve')];
                             N_cons_used = N_cons_used + 1;
                         end
         
@@ -384,9 +395,10 @@ function [xstar, agents] = ACCA(x_sdp, delta_sdp, deltas, f, constraints, vararg
         % check if everything went well
         for i = 1:m
             for j = i+1:m
-                assert(all_close(agents(i).iterations(k).x, ...
-                                 agents(j).iterations(k).x, 1e-3), ...
-                                 'agents not close'); 
+                if not(all_close(agents(i).iterations(k).x, ...
+                                 agents(j).iterations(k).x, 1e-3))
+                    warning('Agents not close, xstar may not be optimal'); 
+                end
             end
         end
         

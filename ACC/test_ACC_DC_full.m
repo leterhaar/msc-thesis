@@ -109,5 +109,5 @@ plot(repmat(length(C_scens), K, 1), '--')
 
 
 %% Make assertions
-assert(all_close(xstar_acc, xstar_centralized), 'Not the same');
+assert(all_close(xstar, xstar_centralized), 'Not the same');
 assert(sum(feasibility(end, :)) == 0, 'Not all feasible in the end');
