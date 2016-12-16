@@ -35,8 +35,4 @@ assignin('caller', 'green', [ 0.8500    0.3250    0.0980]);
 assignin('caller', 'orange', [0.9290    0.6940    0.1250] );
 assignin('caller', 'brown', [ 0.4940    0.1840    0.5560]);	
 
-
-
-
-
 end

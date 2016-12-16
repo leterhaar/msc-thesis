@@ -43,10 +43,9 @@ function [xstar, agents] = ACCA(x_sdp, delta_sdp, deltas, f, constraints, vararg
     % check types of input
     assert(isa(x_sdp, 'sdpvar'), 'x_sdp should be sdpvar');
     assert(isa(delta_sdp, 'sdpvar'), 'delta_sdp should be sdpvar');
-    assert(isa(f, 'function_handle'), ...
-                                'f should be function handle');
+    assert(isa(f, 'function_handle'), 'f should be function handle');
     assert(isa(constraints, 'constraint') || ...
-      isa(constraints, 'lmi'), 'constraints should be lmis');
+                    isa(constraints, 'lmi'), 'constraints should be lmis');
   
     % store dimensions
     d = size(x_sdp);

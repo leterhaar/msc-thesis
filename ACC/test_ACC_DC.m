@@ -77,7 +77,7 @@ end
 initfig('ACC iterations', 1);
 ax = subplot(211);
 hold off
-plot(convergence);
+semilogy(convergence);
 grid on
 ylabel('|f(x_k^i) - f(x^*) |')
 title('Convergence');

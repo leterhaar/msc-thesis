@@ -19,11 +19,11 @@ wind.generate(N);
 t_wind = randi(24);
 x_sdp = sdpvar(5*dc.N_G, 1, 'full');
 delta_sdp = sdpvar(1,3, 'full');
-m = 4;
+m = 5;
 
 % create SVM problem
 N_svm = 200;
-d = 50;
+d = 100;
 svm = create_SVM(d,N_svm);
 test_sequence = {   'equivalence_svm', ...
                     'equivalence_solvers', ...

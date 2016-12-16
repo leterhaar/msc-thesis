@@ -15,5 +15,15 @@ function deleted = vacuum
     if not(isempty(deleted)) > 0
         fprintf('Deleted %i files: %s\n', j, strjoin(deleted, ', '));
     end
+    
+    openfiles = matlab.desktop.editor.getAll;
+    
+    % close any empty files in the editor
+    for i = 1:length(openfiles)
+        if isempty(openfiles(i).Text)
+            openfiles(i).close();
+        end
+    end
+    
 
 end

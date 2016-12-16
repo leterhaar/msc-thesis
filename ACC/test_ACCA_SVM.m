@@ -1,28 +1,43 @@
 
-ops = sdpsettings('solver', 'mosek');
-diam = 2;
-G = random_graph(m, diam, 'rand');
+ops = sdpsettings('verbose', 0, 'solver', 'gurobi');
+diam = 1;
+
+G = ones(m) - eye(m);
 
 % run the AACC algorithm
-[xstar_ACCA, agents_ACCA] = ACCA(svm.B, svm.delta, svm.deltas, svm.f, ...
-                           svm.cons_delta, ...
+[xstar_ACCA, agents_ACCA] = ACCA_fcn(svm.B, svm.deltas, svm.f, ...
+                           svm.cons_fcn, ...
                            'opt_settings', ops,...
                            'n_agents', m,...
                            'connectivity', G,...
-                           'max_its', 20,...
+                           'max_its', 15,...
                            'diameter', diam,...
                            'debug', 1,...
-                           'verbose', 1);
+                           'verbose', 1,...
+                           'residuals', svm.residual_delta);
 
-% run the ACC algorithm
-[xstar_ACC, agents_ACC] = ACC(svm.B, svm.delta, svm.deltas, svm.f, ...
-                           svm.cons_delta, ...
+% run the AACC algorithm
+[xstar_ACC, agents_ACC] = ACCA_fcn2(svm.B, svm.deltas, svm.f, ...
+                           svm.cons_fcn, ...
                            'opt_settings', ops,...
                            'n_agents', m,...
                            'connectivity', G,...
+                           'max_its', 15,...
                            'diameter', diam,...
                            'debug', 1,...
-                           'verbose', 1);
+                           'verbose', 1,...
+                           'residuals', svm.residual_delta);
+
+% %%run the ACC algorithm
+% [xstar_ACC, agents_ACC] = ACC(svm.B, svm.delta, svm.deltas, svm.f, ...
+%                            svm.cons_delta, ...
+%                            'opt_settings', ops,...
+%                            'n_agents', m,...
+%                            'connectivity', G,...
+%                            'diameter', diam,...
+%                            'debug', 1,...
+%                            'verbose', 1,...
+%                            'residuals', svm.residual_delta);
                        
 %% calculate convergence and feasibility
 K = length(agents_ACCA(1).iterations);
@@ -92,12 +107,13 @@ for i = 1:m
 end
 
 %% plot
-initfig('ACC iterations', 1);
+fig = initfig('ACC iterations', 4);
 ax = subplot(211, 'YScale', 'log');
 grid on
 hold on
-plot(convergence_ACCA, 'color', green);
-plot(convergence_ACC, ':', 'color', blue);
+hs1 = plot(convergence_ACCA, 'color', green);
+hs2 = plot(convergence_ACC, ':', 'color', blue);
+legend([hs2(1) hs1(1)], 'ACC', 'ACCA')
 ylabel('|f(x_k^i) - f(x^*) |')
 title(sprintf('ACC convergence for SVM with d=%i, m=%i ACCA', d, N_svm));
 
@@ -107,6 +123,7 @@ grid on
 hold on
 plot(feasibility_ACCA, 'color', green);
 plot(feasibility_ACC, ':', 'color', blue);
+
 ylabel('% violated');
 xlabel('iterations');
 
@@ -114,8 +131,9 @@ initfig('ACC timing', 2);
 ax = subplot(211);
 grid on
 hold on
-plot(time_per_iteration_ACCA, 'color', green);
-plot(time_per_iteration_ACC, ':', 'color', blue);
+hs1 = plot(time_per_iteration_ACCA, 'color', green);
+hs2 = plot(time_per_iteration_ACC, ':', 'color', blue);
+legend([hs2(1) hs1(1)], 'ACC', 'ACCA')
 ylabel('Time per iteration');
 
 ax2 = subplot(212);
@@ -128,10 +146,14 @@ ylabel('Optimizations run');
 xlabel('Iteration');
 
 initfig('No of constraints used', 3);
-plot(no_cons_used_ACCA, 'color', green);
-plot(no_cons_used_ACC, ':', 'color', blue);
+hs1 = plot(no_cons_used_ACCA, 'color', green);
+hs2 = plot(no_cons_used_ACC, ':', 'color', blue);
+legend([hs2(1) hs1(1)], 'ACC', 'ACCA')
+
+uistack(fig);
+figure(fig);
 %% make assertions
-assert(all_close(xstar_ACC, svm.Bstar, 1e-4), 'Not close');
-assert(all_close(xstar_ACCA, svm.Bstar, 1e-4), 'Not close');
-assert(sum(feasibility_ACC(k,:)) == 0, 'Not all feasible');
-assert(sum(feasibility_ACCA(k,:)) == 0, 'Not all feasible');
+verify(all_close(xstar_ACC, svm.Bstar, 1e-4), 'ACC not optimal');
+verify(all_close(xstar_ACCA, svm.Bstar, 1e-4), 'ACCA not optimal');
+verify(sum(feasibility_ACC(k,:)) == 0, 'ACC not all feasible');
+verify(sum(feasibility_ACCA(k,:)) == 0, 'ACCA not all feasible');

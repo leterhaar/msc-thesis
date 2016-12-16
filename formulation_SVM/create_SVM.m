@@ -49,6 +49,7 @@ function prob = create_SVM(d, m)
         
         % define constraints as function of delta
         prob.cons_delta = prob.delta(1) * prob.delta(2:end) * prob.B >= 1;
+        prob.cons_fcn = @(B, delta) delta(1) * delta(2:end) * B >= 1;
         prob.deltas = [prob.ys prob.xs'];
 
         prob.f = @(B) 0.5*norm(B)^2;
