@@ -7,7 +7,7 @@ function verify(that, msg, dostop)
             fprintf('\nVerification failed: %s\n', msg);
         end
         dbstack
-        if nargin < 3
+        if nargin > 2
             evalin('caller', 'keyboard');
         end
         evalin('caller', 'hasVerificationErrors = 1;');

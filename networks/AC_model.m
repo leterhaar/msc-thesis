@@ -284,12 +284,16 @@ classdef AC_model < handle
                              real(Y_lm.' - Y_lm) imag(Y_lm + Y_lm.')];
         end
         
-        function Mk = M_k(obj, k)
+        function Mk = M_k(obj, k, flag)
             %% returns M_k from Lavei 2012
             assert(k <= obj.N_b, 'k cannot be larger than number of buses');
             e_k = obj.e(k);
             Mk = [e_k*e_k' zeros(obj.N_b)
                   zeros(obj.N_b) e_k*e_k'];
+            % for the Madani version, only return the first block
+            if nargin > 2
+                Mk = Mk(1:obj.N_b, 1:obj.N_b);
+            end
         end
 
         function set_WPG_bus(obj, WPG_bus_index)

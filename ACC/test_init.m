@@ -23,7 +23,7 @@ m = 5;
 
 % create SVM problem
 N_svm = 200;
-d = 100;
+d = 20;
 svm = create_SVM(d,N_svm);
 test_sequence = {   'equivalence_svm', ...
                     'equivalence_solvers', ...
