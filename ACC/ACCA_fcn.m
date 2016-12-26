@@ -7,9 +7,9 @@
 % PARAMETERS
 % ==========
 % x_sdp         : optimization variable (sdpvar)
-% f             : function handle for the objective function
-% constraints   : a function that returns an LMI object 
 % deltas        : a N x .. matrix with realizations of delta on the rows
+% objective_fcn : function handle for the objective function
+% constraints_fcn : a function that returns an LMI object 
 % options       : key value pairs, optional, of following format:
 %  - verbose    : flag to show progress, 1 = show (default), 0 = hide
 %  - opt_settings : sdpsettings for optimization (default verbose=0)
@@ -45,8 +45,7 @@ function [xstar, agents] = ACCA_fcn(x_sdp, deltas, f, cons_fcn, varargin)
     % store dimensions
     d = size(x_sdp);
     N= size(deltas, 1);
-    Ncons = length(cons_fcn);
-    
+
     % define default options
     options = struct('verbose', 0, ...
                      'opt_settings', sdpsettings('verbose', 0), ...
@@ -114,6 +113,8 @@ function [xstar, agents] = ACCA_fcn(x_sdp, deltas, f, cons_fcn, varargin)
         options.x0 = zeros_like(x_sdp);
     end
     
+    Ncons = length(cons_fcn(options.x0, deltas(1,:)));
+    
     % find connectivity graph
     if isempty(options.connectivity)
         if not(exist('digraph', 'file'))
@@ -152,32 +153,6 @@ function [xstar, agents] = ACCA_fcn(x_sdp, deltas, f, cons_fcn, varargin)
                                             'active_deltas', [],...
                                             'x', options.x0, ...
                                             'time', nan));
-                  
-        %% precompile solvers for every constraint in the set
-%         cons_solvers = cell(Ncons, 1);
-%         if verbose
-%             p = progress('Compiling solvers', Ncons+1);
-%         end
-%         
-%         % define objective with consensus term
-%         z_sdp = sdpvar(d(1), d(2), 'full');
-%         alpha_sdp = sdpvar(1);
-%         Obj_consensus = f(x_sdp) + ...
-%                              1/(2*alpha_sdp) * norm(x_sdp(:) - z_sdp(:))^2;
-% 
-%         % define a solver for every type of constraint in constraint set
-%         for i = 1:Ncons
-%             cons_solvers{i} = optimizer([options.default_constraint,...
-%                                         constraints(i)], ...
-%                                         Obj_consensus, ...
-%                                         options.opt_settings, ...
-%                                         {delta_sdp, z_sdp, alpha_sdp}, ...
-%                                         x_sdp);
-%                                     
-%             if verbose
-%                 p.ping();
-%             end
-%         end
                        
         %% start main iterations
         k = 1;
@@ -279,6 +254,7 @@ function [xstar, agents] = ACCA_fcn(x_sdp, deltas, f, cons_fcn, varargin)
                         % only use the constraints from infeasible deltas
                         if residual < -1e-6
                             C_i = [C_i; L(j, :)];
+                            
                              % use previously defined cons_delta
                             if isempty(options.residuals)
                                 C_all = [C_all, cons_delta(L(j,1))];

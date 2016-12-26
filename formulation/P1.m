@@ -2,9 +2,10 @@
 % OtH 6-9-16
 addpath('../misc');
 addpath('../wind');
+addpath('../networks');
 tic
 %% Load models
-ac = AC_model('case_ieee30a');
+ac = AC_model('case14a');
 ac.set_WPG_bus(22);
 
 % figure(1);

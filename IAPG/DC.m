@@ -8,7 +8,7 @@ addpath('../experiment');
 addpath('../misc');
 
 N_t = 24;      % number of time steps
-N = 2;       % number of scenarios
+N = 50;       % number of scenarios
 max_its = 500; % maximum number of iterations
 
 % initialize models
@@ -25,10 +25,14 @@ Obj = DC_f(x, dc, wind);
 C_det = DC_cons_det(x, dc, wind);
 C_cent = [C_det];
 constraints = cell(N,1);
+fs = cell(N,1);
+grad_fs = cell(N,1);
 for i = 1:N
     C = DC_cons_scen(x, dc, wind.slice(i));
     C_cent = [C_cent, C];
     constraints{i} = C;
+    fs{i} = @(x) DC_f(x, dc, wind);
+    grad_fs{i} = @(x) DC_gradient_f(x, dc, wind);
 end
 
 % solve centralized problem
@@ -41,12 +45,10 @@ toc
 % solve problem w/o objective
 info = optimize(C_cent, [], opt_settings);
 assert(not(info.problem), info.info);
-x0 = value(x);
-
+x0 = value(x);    
 %% run algorithms
 
-[x_IAPG, its_IAPG] = IAPG(x, @(x) DC_f(x, dc, wind), ...
-                             @(x) DC_gradient_f(x, dc, wind), ...
+[~, its_IAPG] = IAPG(x, fs, grad_fs, ...
                              constraints, ...
                              'x0', x0, ...
                              'default_constraint', C_det, ...
@@ -54,8 +56,7 @@ x0 = value(x);
                              'max_its', max_its, ...
                              'verbose', 1);
                          
-[x_IAPG2, its_IAPG2] = IAPG_light(x, @(x) DC_f(x, dc, wind), ...
-                             @(x) DC_gradient_f(x, dc, wind), ...
+[~, its_IAPG_light] = IAPG_light(x, fs, grad_fs, ...
                              constraints, ...
                              'x0', x0, ...
                              'default_constraint', C_det, ...
@@ -64,15 +65,15 @@ x0 = value(x);
                              'verbose', 1, ...
                              'b', N);
                                                   
-[x_IPG, its_IPG] = IPG(x, @(x) DC_f(x, dc, wind), ...
-                             @(x) DC_gradient_f(x, dc, wind), ...
+
+[~, its_IAPG_register] = IAPG_light_register(x, fs, grad_fs, ...
                              constraints, ...
                              'x0', x0, ...
                              'default_constraint', C_det, ...
                              'opt_settings', opt_settings, ...
                              'max_its', max_its, ...
-                             'verbose', 1);
-                         
+                             'verbose', 1, ...
+                             'b', N);                         
 %% check feasibility a posteriori
 tol = 1e-6;
 p = progress('Checking constraints', max_its);
@@ -85,45 +86,43 @@ for i = 1:max_its
     its_IAPG(i).feas = sum(residuals < -tol)/Ncons * 100;
     
     % check IAPG2
-    assign(x, its_IAPG2(i).x);
+    assign(x, its_IAPG_light(i).x);
     residuals = check(C_cent);
-    its_IAPG2(i).feas = sum(residuals < -tol)/Ncons * 100;
+    its_IAPG_light(i).feas = sum(residuals < -tol)/Ncons * 100;
     
      % check IPG
-    assign(x, its_IPG(i).x);
+    assign(x, its_IAPG_register(i).x);
     residuals = check(C_cent);
-    its_IPG(i).feas = sum(residuals < -tol)/Ncons * 100;
+    its_IAPG_register(i).feas = sum(residuals < -tol)/Ncons * 100;
     
     p.ping();
 end
 %% Plot
 initfig('Objectives', 1);
 Obj_opt = DC_f(x_star, dc, wind);
-differences_objective_IPG = abs([its_IPG(2:end).f] - Obj_opt);
+differences_objective_IAPG_register = abs([its_IAPG_register(2:end).f] - Obj_opt);
 differences_objective_IAPG = abs([its_IAPG(2:end).f] - Obj_opt);
-differences_objective_IAPG2 = abs([its_IAPG2(2:end).f] - Obj_opt);
+differences_objective_IAPG_light = abs([its_IAPG_light(2:end).f] - Obj_opt);
 
 ax = subplot(211);
 hold off
-semilogy(differences_objective_IPG, 'linewidth', 2);
+semilogy(differences_objective_IAPG_register, 'linewidth', 2);
 hold on
+plot(differences_objective_IAPG_light, 'linewidth', 2);
 plot(differences_objective_IAPG, 'linewidth', 2);
-plot(differences_objective_IAPG2, 'linewidth', 2);
 grid on
 ylabel('|f(x)-f(x*)|');
-legend('IPG', 'IAPG', 'IAPG-light');
-title('Objective');
+legend('IAPG-l-r', 'IAPG-l', 'IAPG');
+title('DC Objective');
 % Plot feasibility percentage
 
 ax2 = subplot(212);
-plot([its_IPG.feas]);
+plot([its_IAPG_register.feas]);
 hold on
 title('Feasibility');
-
+plot([its_IAPG_light.feas]);
 plot([its_IAPG.feas]);
 grid on;
-plot([its_IAPG2.feas]);
-legend('IPG', 'IAPG', 'IAPG-light');
 ylabel('% violated');
 linkaxes([ax, ax2], 'x');
 % 
@@ -139,10 +138,10 @@ linkaxes([ax, ax2], 'x');
 
 %% plot times
 initfig('Times', 3);
-plot([its_IPG.time]);
+plot([its_IAPG_register.time]);
+plot([its_IAPG_light.time]);
 plot([its_IAPG.time]);
-plot([its_IAPG2.time]);
-legend('IPG', 'IAPG', 'IAPG-light');
+legend('IAPG-l-r', 'IAPG-l', 'IAPG');
 ylabel('Time per iteration');
 xlabel('Iteration');
 

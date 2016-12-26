@@ -1,5 +1,7 @@
 % script to test whether the tree decomposition of the 14 bus network is
 % the same as the full problem
+% clear
+yalmip('clear');
 
 if not(exist('AC_f', 'file'))
     addpath('../formulation');
@@ -11,11 +13,11 @@ end
 
 %% load models
 N_t = 24;   % optimization horizon
-N = 1;      % number of scenarios used for optimization
+N = 30;      % number of scenarios used for optimization
 t = 1; % timestep used for this demonstration (todo: add for everything)
 
 % load network and wind models
-ac = AC_model('case_ieee30a');
+ac = AC_model('case14a');
 wind = wind_model(ac, N_t, 0.2);
 
 % generate a number of scenarios
@@ -56,6 +58,7 @@ end
 
 % add up and downspinning 
 Obj = Obj + ac.c_us' * R_us + ac.c_ds' * R_ds;
+
 %% define constraints (except psd)
 
 C = [R_us >= 0, R_ds >= 0, sum(d_ds) == 1, sum(d_us) == 1];
@@ -63,7 +66,7 @@ C = [R_us >= 0, R_ds >= 0, sum(d_ds) == 1, sum(d_us) == 1];
 % loop over scenario constraints
 for i = 1:N+1
     % refbus angle constraints
-    refbus_index = ac.refbus + (i-1)*N;
+    refbus_index = ac.refbus + (i-1)*ac.N_b;
     C = [C; imag(X(refbus_index, refbus_index)) == 0];
     
     for k = 1:ac.N_b
@@ -108,15 +111,23 @@ for i = 1:N+1
         end
     end
 end
-%% solve problem with psd constraint on whole matrix variable
+%% solve problem with psd constraint on every scenario matrix variable
+C_psdness_whole = [];
+
+for i = 1:N+1
+    
+    C_psdness_whole = [C_psdness_whole; X(select{i,:}) >= 0];
+end
+
 
 tic
-status = optimize([X >= 0, C], Obj, ops);
+status = optimize([C_psdness_whole, C], Obj, ops);
 toc
 verify(not(status.problem), status.info);
 verify(not(any(check(C) < -1e-6)), 'Infeasible solution!')
 
 Xstar_whole = value(X);
+Xstar_whole(isnan(Xstar_whole)) = 0; % remove nans
 Rus_whole = value(R_us);
 Rds_whole = value(R_ds);
 dus_whole = value(d_us);
@@ -150,18 +161,35 @@ status = optimize([C_psdness, C], Obj, ops);
 toc
 verify(not(status.problem), status.info);
 verify(not(any(check(C) < -1e-6)), 'Infeasible solution!')
-
+%%
 Xstar_tree = value(X);
+
+for i = 1:N+1
+    verify(not(any(isnan(Xstar_tree(select{i,:})))), 'nans in tree submatrix for s%2i', i);
+end
+        
+Xstar_tree(isnan(Xstar_tree)) = 0;
 Rus_tree = value(R_us);
 Rds_tree = value(R_ds);
 dus_tree = value(d_us);
 dds_tree = value(d_ds);
 %% test rank of solutions and constraint satisfaction
 
-verify(svd_rank(Xstar_whole) == 1, 'whole sdp not rank 1');
-verify(svd_rank(Xstar_tree) == 1, 'tree sdp not rank 1');
+verify(svd_rank(Xstar_whole) == N+1, 'whole matrix not rank %i', N+1);
+verify(svd_rank(Xstar_tree) == N+1, 'tree matrix not rank %i', N+1);
+verify(is_psd(Xstar_whole), 'whole matrix is not psd');
+verify(is_psd(Xstar_tree), 'tree matrix is not psd');
 
-verify(all_close(Rus_tree, Rus_whole), 'Rus not close');
-verify(all_close(Rds_tree, Rds_whole), 'Rds not close');
-verify(all_close(dus_tree, dus_whole), 'dus not close');
-verify(all_close(dds_tree, dds_whole), 'dds not close');
+for i = 1:N+1
+    W_whole = Xstar_whole(select{i,:});
+    verify(svd_rank(W_whole) == 1, sprintf('submatrix whole not rank 1 for s%2i', i));
+    verify(is_psd(W_whole) == 1, sprintf('submatrix whole not psd for s%2i', i));
+    W_tree = Xstar_tree(select{i,:});
+    verify(svd_rank(W_tree) == 1, sprintf('submatrix tree not rank 1 for s%2i', i));
+    verify(is_psd(W_tree) == 1, 'submatrix tree not psd for s%2i: %g', i, min(eig(W_tree)));
+end
+
+verify(all_close(Rus_tree, Rus_whole, 1e-5), 'Rus not close: %g', norm(Rus_tree-Rus_whole, 'inf'));
+verify(all_close(Rds_tree, Rds_whole, 1e-5), 'Rds not close: %g', norm(Rds_tree-Rds_whole, 'inf'));
+verify(all_close(dus_tree, dus_whole, 1e-4), 'dus not close: %g', norm(dus_tree-dds_whole, 'inf'));
+verify(all_close(dds_tree, dds_whole, 1e-4), 'dds not close: %g', norm(dds_tree-dds_whole, 'inf'));

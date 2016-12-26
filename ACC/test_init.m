@@ -22,8 +22,8 @@ delta_sdp = sdpvar(1,3, 'full');
 m = 5;
 
 % create SVM problem
-N_svm = 200;
-d = 20;
+N_svm = 1000;
+d = 200;
 svm = create_SVM(d,N_svm);
 test_sequence = {   'equivalence_svm', ...
                     'equivalence_solvers', ...

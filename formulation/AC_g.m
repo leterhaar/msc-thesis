@@ -126,7 +126,20 @@ function [g, W_s, labels] = AC_g(x, ac, wind, t, j_des)
 
     end
     if j_des > 0 
-        g = g(j_des);
+        try
+            g = g(j_des);
+        catch e
+            if j_des == j
+                % we want to have the residual for the last constraint,
+                % which is the psd constraint. Return 0 for now (i.e.
+                % always tight)
+%                 g = min(eig(W_s));
+                g = 0;
+            else
+                rethrow(e);
+            end
+        end
+        
     end
 end
 
