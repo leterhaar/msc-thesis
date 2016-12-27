@@ -1,6 +1,4 @@
 % initialize problem
-% script to test whether the AC OPF with only extremes yields the same
-% solution as the original fully defined problem
 
 clc
 clear
@@ -15,16 +13,16 @@ end
 
 %% load models
 N_t = 24;   % optimization horizon
-N = 5;      % number of scenarios used for optimization
+N = 2;      % number of scenarios used for optimization
 t = 1; % timestep used for this demonstration (todo: add for everything)
 
 % load network and wind models
 ac = AC_model('case14a');
-ac.set_WPG_bus(9);
+ac.set_WPG_bus(2);
 wind = wind_model(ac, N_t, 0.2);
 
 % generate a number of scenarios
-wind.generate(N);
+wind.dummy(N);
 
 % optimization settings
 ops = sdpsettings('solver', 'mosek', 'verbose', 0);
@@ -80,12 +78,11 @@ verify(all_close(xstar_cent, xstar_cent_using_delta), ...
                                             'Cons fcn is not equivalent');
 %% run algorithm
 
-[xstar, agents_ACCA] = ACC_fcn_cell(x_cell, deltas, objective_fcn, cons_fcn, ...
+[xstar, agents_ACC] = ACC_fcn_cell(x_cell, deltas, objective_fcn, cons_fcn, ...
                              'default_constraint', default_constraints,...
                              'residuals', residuals,...
                              'use_selector', true,...
                              'opt_settings', ops,...
-                             'stepsize', @(k) 1e30,...
                              'connectivity', G,...
                              'tolerance', 1e-6,...
                              'diameter', diam,...
@@ -98,39 +95,39 @@ verify(all_close(xstar_cent, xstar_cent_using_delta), ...
 verify(AC_check(xstar, ac, wind, t) == 0, 'Infeasible solution');
 
 %% calculate convergence and feasibility
-K = length(agents_ACCA(1).iterations);
-convergence_ACCA = nan(K,N);
-feasibility_ACCA = nan(K,N);
-time_per_iteration_ACCA = nan(K,N);
+K = length(agents_ACC(1).iterations);
+convergence_ACC = nan(K,N);
+feasibility_ACC = nan(K,N);
+time_per_iteration_ACC = nan(K,N);
 optimal_objective = objective_fcn(xstar_cent);
-optimizations_run_ACCA = zeros(K,1);
-no_cons_used_ACCA = nan(K,N);
+optimizations_run_ACC = zeros(K,1);
+no_cons_used_ACC = nan(K,N);
 no_cons_active = nan(K,N);
 p = progress('Checking constraints', N);
-timing_ACCA = zeros(K,1);
+timing_ACC = zeros(K,1);
 
 for i = 1:N
     for k = 1:K
         % calculate difference with centralized objective
-        convergence_ACCA(k,i) = abs(agents_ACCA(i).iterations(k).J ...
+        convergence_ACC(k,i) = abs(agents_ACC(i).iterations(k).J ...
                                                 - optimal_objective);
         
         % calculate feasibility percentage
-        assign_cell(x_cell, agents_ACCA(i).iterations(k).x)
-        feasibility_ACCA(k,i) = sum(check(C_all) < -1e-6) / (N*Ncons) * 100;
+        assign_cell(x_cell, agents_ACC(i).iterations(k).x)
+        feasibility_ACC(k,i) = sum(check(C_all) < -1e-6) / (N*Ncons) * 100;
         
         % store times
-        time_per_iteration_ACCA(k,i) = agents_ACCA(i).iterations(k).time;
-        timing_ACCA(k) = timing_ACCA(k) + agents_ACCA(i).iterations(k).time;
+        time_per_iteration_ACC(k,i) = agents_ACC(i).iterations(k).time;
+        timing_ACC(k) = timing_ACC(k) + agents_ACC(i).iterations(k).time;
 
         
         % store total number of iterations run
         if true
-            optimizations_run_ACCA(k) = optimizations_run_ACCA(k) + ...
-                                    agents_ACCA(i).iterations(k).info.optimized;
+            optimizations_run_ACC(k) = optimizations_run_ACC(k) + ...
+                                    agents_ACC(i).iterations(k).info.optimized;
             
-            no_cons_used_ACCA(k,i) = agents_ACCA(i).iterations(k).info.num_cons;
-            no_cons_active(k,i) = size(agents_ACCA(i).iterations(k).active_deltas, 1);
+            no_cons_used_ACC(k,i) = agents_ACC(i).iterations(k).info.num_cons;
+            no_cons_active(k,i) = size(agents_ACC(i).iterations(k).active_deltas, 1);
 
         end
     end
@@ -142,15 +139,15 @@ fig = initfig('ACC iterations', 4);
 ax = subplot(211, 'YScale', 'log');
 grid on
 hold on
-hs1 = plot(convergence_ACCA, '-x', 'color', green);
+hs1 = plot(convergence_ACC, '-x', 'color', green);
 ylabel('|f(x_k^i) - f(x^*) |')
-title(sprintf('ACCA convergence for AC OPF %s with %i scenarios', ac.model_name, N));
+title(sprintf('ACC convergence for AC OPF %s with %i scenarios', ac.model_name, N));
 
 ax2 = subplot(212);
 linkaxes([ax ax2], 'x');
 grid on
 hold on
-plot(feasibility_ACCA, '-x', 'color', green);
+plot(feasibility_ACC, '-x', 'color', green);
 
 ylabel('% violated');
 xlabel('iterations');
@@ -159,20 +156,20 @@ initfig('ACC timing', 2);
 ax = subplot(211);
 grid on
 hold on
-hs1 = plot(time_per_iteration_ACCA, 'o', 'color', green);
-plot(timing_ACCA, 'o-', 'color', green);
+hs1 = plot(time_per_iteration_ACC, 'o', 'color', green);
+plot(timing_ACC, 'o-', 'color', green);
 ylabel('Time per iteration');
 
 ax2 = subplot(212);
 linkaxes([ax ax2], 'x');
 grid on
 hold on
-plot(optimizations_run_ACCA, 'color', green);
+plot(optimizations_run_ACC, 'color', green);
 ylabel('Optimizations run');
 xlabel('Iteration');
 
 initfig('No of constraints', 3);
-hs1 = plot(no_cons_used_ACCA, 'color', green);
+hs1 = plot(no_cons_used_ACC, 'color', green);
 hs2 = plot(no_cons_active, 'color', blue);
 hs3 = plot(N*Ncons*ones(K,1), '--');
 xlabel('Iteration');
@@ -182,6 +179,6 @@ uistack(fig);
 
 %% make assertions
 verify(all_close(xstar, xstar_cent, 1e-4), 'Not optimal');
-verify(sum(feasibility_ACCA(end,:)) == 0, 'Not all feasible');
+verify(sum(feasibility_ACC(end,:)) == 0, 'Not all feasible');
 
 

@@ -12,6 +12,7 @@ function [f1, f2, f3] = check_and_plot(agents, optimal_objective, residual_fcn)
     time_per_iteration = nan(K,N);
     optimizations_run = zeros(K,1);
     no_cons_used = nan(K,N);
+    active_deltas = nan(K,N);
     timing = zeros(K,1);
 
     p = progress('Checking constraints', N);
@@ -37,6 +38,7 @@ function [f1, f2, f3] = check_and_plot(agents, optimal_objective, residual_fcn)
                                         agents(i).iterations(k).info.optimized;
 
                 no_cons_used(k,i) = agents(i).iterations(k).info.num_cons;
+                active_deltas(k,i) = size(agents(i).iterations(k).active_deltas, 1);
 
             end
         end
@@ -61,6 +63,7 @@ function [f1, f2, f3] = check_and_plot(agents, optimal_objective, residual_fcn)
 
     ylabel('% violated');
     xlabel('iterations');
+    xlim([1 K]);
 
     f2 = initfig('Timing', 2);
     ax = subplot(211);
@@ -76,12 +79,15 @@ function [f1, f2, f3] = check_and_plot(agents, optimal_objective, residual_fcn)
     hold on
     plot(optimizations_run, 'color', green);
     ylabel('Optimizations run');
+    xlim([1 K]);
     xlabel('Iteration');
 
     f3 = initfig('No of constraints used', 3);
     hs1 = plot(no_cons_used, 'color', green);
+    hs3 = plot(active_deltas, 'color', blue);
     h2 = plot(repmat(length(residuals), K, 1), '--');
-    legend([hs1(1) h2], '|A_i^{(k)}|', '|C_{all}|');
+    xlim([1 K]);
+    legend([hs1(1) hs3(1) h2], '|C_i^{(k)}|', '|A_i^{(k)}|', '|C_{all}|');
     uistack(f1);
     figure(f1);
 end

@@ -5,7 +5,7 @@ function test(name)
     % create testCase object for verification
     close all
     for file = dir'
-        if strcmp(file.name,'test_init.m');
+        if strcmp(file.name,'test_init.m')
             path = strsplit(pwd, '/');
             fprintf('Initializing tests in %s\n', path{end});
             eval('test_init');

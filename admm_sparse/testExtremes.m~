@@ -14,13 +14,13 @@ end
 
 %% load models
 N_t = 24;   % optimization horizon
-N = 200;      % number of scenarios used for optimization
+N = 2;      % number of scenarios used for optimization
 t = 1; % timestep used for this demonstration (todo: add for everything)
 
 % load network and wind models
-ac = AC_model('case14a');
-ac.set_WPG_bus(9);
-wind = wind_model(ac, N_t, 0.2);
+ac = AC_model('case5');
+ac.set_WPG_bus(2);
+wind = wind_model(ac, N_t, 0.9);
 
 % generate a number of scenarios
 wind.dummy(N);
@@ -127,7 +127,6 @@ for i = 1:N+1
     end
     
 end
-%% Solve
 % solve problem with psd constraint on every scenario matrix variable
 tic
 status = optimize(C, Obj, ops);

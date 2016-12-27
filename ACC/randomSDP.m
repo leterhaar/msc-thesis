@@ -1,11 +1,11 @@
 %% Test the ACC algorithm for a random SDP
 function randomSDP
-    yalmip('clear') 
+    yalmip('clear')
 
     % define settings
     d = 4;          % dimension of decision variable
-    m = 3;          % dimension of constraint set per 1 uncertainty
-    N = 100;         % number of scenarios      
+    m = 2;          % dimension of constraint set per 1 uncertainty
+    N = 30;         % number of scenarios 
 
     % create SDP vars for every scenario
     x = {sdpvar(d), sdpvar(d), sdpvar(d)};
@@ -20,9 +20,9 @@ function randomSDP
     for i = 1:m
         As{i} = randsymmatrix(d);
         for j = 1:N
-            C_all = [C_all, trace(As{i}*x{1}) <= deltas(j,i)];
-            C_all = [C_all, trace(As{i}*x{2}) <= 2*deltas(j,i)];
-            C_all = [C_all, trace(As{i}*x{3}) <= 3*deltas(j,i)];
+            C_all = [C_all, trace(As{i}*x{1}) >= deltas(j,i)];
+            C_all = [C_all, trace(As{i}*x{2}) >= 2*deltas(j,i)];
+            C_all = [C_all, trace(As{i}*x{3}) >= 3*deltas(j,i)];
 
         end
     end
@@ -52,31 +52,32 @@ function randomSDP
     assert(not(status.problem), status.info);
     xstar_centralized = values_cell(x);
     fprintf('Centralized solved in %g seconds\n', toc);
-    
+
     % run ACC algorithm
     [xstar, agents] = ACC_fcn_cell(x, deltas, obj_fcn, cons_fcn_handle, ...
-                              'verbose', 1,...
-                              'debug', 1,...
-                              'opt_settings', ops,...
-                              'default_constraint', [x{1} >= 0, x{2} >= 0, x{3} >= 0]);
+                          'verbose', 1,...
+                          'debug', 1,...
+                          'opt_settings', ops,...
+                          'default_constraint', [x{1} >= 0, x{2} >= 0, x{3} >= 0]);
     verify(all_close(xstar_centralized, xstar), 'Not the same');
     check_and_plot(agents, obj_fcn(xstar_centralized), @(x_values) residuals_fcn(x, x_values, C_all));
+    keyboard
 end
 
 function C = cons_fcn(x, delta, As)
 % creates the constraints
     C = [];
     for i = 1:length(delta)
-        C = [C, trace(As{i}*x{1}) <= delta(i)];
-        C = [C, trace(As{i}*x{2}) <= 2*delta(i)];
-        C = [C, trace(As{i}*x{3}) <= 3*delta(i)];
+        C = [C, trace(As{i}*x{1}) >= delta(i)];
+        C = [C, trace(As{i}*x{2}) >= 2*delta(i)];
+        C = [C, trace(As{i}*x{3}) >= 3*delta(i)];
     end
 end
 
 function A = randsymmatrix(d)
 % create a random symmetric matrix
-    A = random_symmetric_matrix(d);
-    return
+%     A = random_symmetric_matrix(d);
+%     return
     a = rand(d,1);
     A = a * a';
 end

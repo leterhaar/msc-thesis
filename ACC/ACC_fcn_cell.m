@@ -157,6 +157,7 @@ function [xstar, agents] = ACC_fcn_cell(x_cell, deltas, f, cons_fcn, varargin)
         
         [agents.iterations] = deal(struct(  'J', f(options.x0), ...
                                             'active_deltas', [],...
+                                            'L', [],...
                                             'x', {options.x0}, ...
                                             'time', nan,...
                                             'info', struct('num_cons', 0, ...
@@ -184,7 +185,7 @@ function [xstar, agents] = ACC_fcn_cell(x_cell, deltas, f, cons_fcn, varargin)
                      agents(i).iterations(k).active_deltas];
                  
                 % loop over neighbouring agents
-                for j = find(connectivity_graph(:, i))';
+                for j = find(connectivity_graph(:, i))'
                     % add A_j for all incoming agents j to constraint set
                     L = [L; agents(j).iterations(k).active_deltas];
                 end
@@ -216,7 +217,7 @@ function [xstar, agents] = ACC_fcn_cell(x_cell, deltas, f, cons_fcn, varargin)
                         residual = residuals(L(j,1));
                     end
                     
-                    if residual < -options.tolerance;
+                    if residual < -options.tolerance
                         feasible_for_all = 0;
                         break
                     end
@@ -246,7 +247,7 @@ function [xstar, agents] = ACC_fcn_cell(x_cell, deltas, f, cons_fcn, varargin)
                             C_all = [C_all, cons_delta(L(j, 1))];
                         end        
                     end
-
+                    
                     status = optimize(C_all, f(x_cell), ...
                                                      options.opt_settings);
                     assert(not(status.problem), status.info);
@@ -275,6 +276,7 @@ function [xstar, agents] = ACC_fcn_cell(x_cell, deltas, f, cons_fcn, varargin)
                 end
                 
                 % store active constraints
+                agents(i).iterations(k+1).L = L;
                 agents(i).iterations(k+1).active_deltas = [];
                 for j = 1:size(L,1)
                     
@@ -298,7 +300,7 @@ function [xstar, agents] = ACC_fcn_cell(x_cell, deltas, f, cons_fcn, varargin)
                         residual = residuals(L(j,1));
                     end
 
-                    if residual < options.tolerance && residual > -options.tolerance;
+                    if residual < options.tolerance && residual > -options.tolerance
                         agents(i).iterations(k+1).active_deltas = [
                             agents(i).iterations(k+1).active_deltas;
                             L(j, :)];

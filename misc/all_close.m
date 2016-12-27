@@ -1,5 +1,12 @@
-function res = all_close(A, B, tol)
-% compares A and B with tolerance
+function [close, infnorm] = all_close(A, B, tol)
+% [res, infnorm] = all_close(A, B, tol)
+%
+% compares A and B with absolute tolerance tol
+%
+% RETURNS
+% =======
+% close: logical to indicate whether A and B are close
+% infnorm: infity norm (max abs) of difference between A and B 
 
     if nargin < 3
         tol = 1e-6;
@@ -10,7 +17,8 @@ function res = all_close(A, B, tol)
     % loop over cell with doubles
     if isa(A, 'cell') && isa(B, 'cell')
 
-        res = 1;
+        close = 1;
+        infnorm = -inf;
         for i = 1:length(A)
             A_tmp = A{i};
             B_tmp = B{i};
@@ -19,14 +27,21 @@ function res = all_close(A, B, tol)
             
             % vectorize and check difference
             if any(abs(A_tmp(:) - B_tmp(:)) >= tol)
-                res = 0;
+                close = 0;
             end
+            
+            infnorm_tmp = norm(A_tmp(:) - B_tmp(:), 'inf');
         end
     
+        % take the maximum
+        infnorm = max(infnorm_tmp, infnorm);
     else
         % vectorize and check difference
-        res = all(abs(A(:) - B(:)) < tol);
+        close = all(abs(A(:) - B(:)) < tol);
+        infnorm = norm(A(:) - B(:), 'inf');
     end
     
-    res = logical(res);
+    close = logical(close);
+    
+    
 end
