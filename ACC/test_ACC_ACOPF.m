@@ -12,17 +12,17 @@ if not(exist('AC_f', 'file'))
 end
 
 %% load models
-N_t = 24;   % optimization horizon
-N = 2;      % number of scenarios used for optimization
-t = 1; % timestep used for this demonstration (todo: add for everything)
+N_t = 24;           % optimization horizon
+N = 20;             % number of scenarios used for optimization
+t = 1;              % timestep used for this demonstration (todo: add for everything)
 
 % load network and wind models
 ac = AC_model('case14a');
-ac.set_WPG_bus(2);
+ac.set_WPG_bus(9);
 wind = wind_model(ac, N_t, 0.2);
 
 % generate a number of scenarios
-wind.dummy(N);
+wind.generate(N);
 
 % optimization settings
 ops = sdpsettings('solver', 'mosek', 'verbose', 0);
@@ -84,7 +84,7 @@ verify(all_close(xstar_cent, xstar_cent_using_delta), ...
                              'use_selector', true,...
                              'opt_settings', ops,...
                              'connectivity', G,...
-                             'tolerance', 1e-6,...
+                             'tolerance', 1e-3,...
                              'diameter', diam,...
                              'max_its', 10,...
                              'n_agents', N,...
@@ -114,7 +114,7 @@ for i = 1:N
         
         % calculate feasibility percentage
         assign_cell(x_cell, agents_ACC(i).iterations(k).x)
-        feasibility_ACC(k,i) = sum(check(C_all) < -1e-6) / (N*Ncons) * 100;
+        feasibility_ACC(k,i) = sum(check(C_all) < -1e-3) / (N*Ncons) * 100;
         
         % store times
         time_per_iteration_ACC(k,i) = agents_ACC(i).iterations(k).time;
