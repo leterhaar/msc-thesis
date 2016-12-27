@@ -79,8 +79,9 @@ function [f1, f2, f3] = check_and_plot(agents, optimal_objective, residual_fcn)
     xlabel('Iteration');
 
     f3 = initfig('No of constraints used', 3);
-    plot(no_cons_used, 'color', green);
-
+    hs1 = plot(no_cons_used, 'color', green);
+    h2 = plot(repmat(length(residuals), K, 1), '--');
+    legend([hs1(1) h2], '|A_i^{(k)}|', '|C_{all}|');
     uistack(f1);
     figure(f1);
 end
