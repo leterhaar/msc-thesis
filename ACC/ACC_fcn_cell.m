@@ -233,7 +233,7 @@ function [xstar, agents] = ACC_fcn_cell(x_cell, deltas, f, cons_fcn, varargin)
                             
                         % use previously defined cons_delta
                         if isempty(options.residuals)
-                            C_all = [C_all, cons_delta(L(j,1))];
+                            C_all = [C_all, cons_delta{L(j,1)}];
 
                         % use cons_fcn with selector
                         elseif options.use_selector
