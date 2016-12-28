@@ -15,7 +15,7 @@ end
 
 %% load models
 N_t = 24;   % optimization horizon
-N = 200;      % number of scenarios used for optimization
+N = 5;      % number of scenarios used for optimization
 t = 1; % timestep used for this demonstration (todo: add for everything)
 tol = 1e-3;
 % load network and wind models
@@ -27,7 +27,7 @@ wind = wind_model(ac, N_t, 0.2);
 wind.generate(N);
 
 % optimization settings
-ops = sdpsettings('solver', 'mosek', 'verbose', 0);
+ops = sdpsettings('solver', 'mosek', 'verbose', 1);
 
 % connectivity matrix
 G = ones(N)-diag(ones(N,1));
@@ -90,7 +90,7 @@ verify(all_close(xstar_cent, xstar_cent_using_delta), ...
                              'tolerance', tol,...
                              'max_its', 15,...
                              'n_agents', N,...
-                             'verbose', 1,...
+                             'verbose', 0,...
                              'debug', 1,...
                              'x0', []);
 %%                         
@@ -115,7 +115,7 @@ for i = 1:N
         
         % calculate feasibility percentage
         assign_cell(x_cell, agents_ACCA(i).iterations(k).x)
-        feasibility_ACCA(k,i) = sum(check(C_all) < -tol) / N*95 * 100;
+        feasibility_ACCA(k,i) = sum(check(C_all) < -tol) / length(C_all) * 100;
         
         % store times
         time_per_iteration_ACCA(k,i) = agents_ACCA(i).iterations(k).time;
