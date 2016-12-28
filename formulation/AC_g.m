@@ -1,5 +1,5 @@
 function [g, W_s, labels] = AC_g(x, ac, wind, t, j_des)
-% [g, W_s, labels] = AC_g_scen(x, ac, P_wf, P_w, t, j_des)
+% [g, W_s, labels] = AC_g(x, ac, wind, t, j_des)
 % formulation of the constraint functions for one scenario g(x,delta) <= 0
 
     W_f = x{1};

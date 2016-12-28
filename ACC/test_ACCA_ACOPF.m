@@ -27,7 +27,7 @@ wind = wind_model(ac, N_t, 0.9);
 wind.generate(N);
 
 % optimization settings
-ops = sdpsettings('solver', 'mosek', 'verbose', 1, 'debug', 1);
+ops = sdpsettings('solver', 'mosek', 'verbose', 0 'debug', 1);
 
 % connectivity matrix
 G = ones(N)-diag(ones(N,1));
@@ -91,7 +91,7 @@ verify(all_close(xstar_cent, xstar_cent_using_delta), ...
                              'tolerance', tol,...
                              'max_its', 15,...
                              'n_agents', N,...
-                             'verbose', 0,...
+                             'verbose', 1,...
                              'debug', 1,...
                              'x0', []);
 %%                         
@@ -136,7 +136,7 @@ for i = 1:N
 end
 
 %% plot
-fig = initfig('ACC iterations', 1);
+fig = initfig('ACCA iterations', 1);
 ax = subplot(211, 'YScale', 'log');
 grid on
 hold on
