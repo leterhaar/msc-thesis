@@ -15,13 +15,13 @@ end
 
 %% load models
 N_t = 24;   % optimization horizon
-N = 5;      % number of scenarios used for optimization
+N = 200;      % number of scenarios used for optimization
 t = 1; % timestep used for this demonstration (todo: add for everything)
-
+tol = 1e-3;
 % load network and wind models
 ac = AC_model('case14a');
-ac.set_WPG_bus(10);
-wind = wind_model(ac, N_t, 0.9);
+ac.set_WPG_bus(9);
+wind = wind_model(ac, N_t, 0.2);
 
 % generate a number of scenarios
 wind.generate(N);
@@ -87,6 +87,7 @@ verify(all_close(xstar_cent, xstar_cent_using_delta), ...
                              'opt_settings', ops,...
                              'connectivity', G,...
                              'diameter', diam,...
+                             'tolerance', tol,...
                              'max_its', 15,...
                              'n_agents', N,...
                              'verbose', 1,...
@@ -114,7 +115,7 @@ for i = 1:N
         
         % calculate feasibility percentage
         assign_cell(x_cell, agents_ACCA(i).iterations(k).x)
-        feasibility_ACCA(k,i) = sum(check(C_all) < -1e-6) / N*95 * 100;
+        feasibility_ACCA(k,i) = sum(check(C_all) < -tol) / N*95 * 100;
         
         % store times
         time_per_iteration_ACCA(k,i) = agents_ACCA(i).iterations(k).time;
@@ -134,7 +135,7 @@ for i = 1:N
 end
 
 %% plot
-fig = initfig('ACC iterations', 4);
+fig = initfig('ACC iterations', 1);
 ax = subplot(211, 'YScale', 'log');
 grid on
 hold on
@@ -151,7 +152,7 @@ plot(feasibility_ACCA, 'color', green);
 ylabel('% violated');
 xlabel('iterations');
 
-initfig('ACC timing', 2);
+initfig('ACC timing', 5);
 ax = subplot(211);
 grid on
 hold on
@@ -167,7 +168,7 @@ plot(optimizations_run_ACCA, 'color', green);
 ylabel('Optimizations run');
 xlabel('Iteration');
 
-initfig('No of constraints used', 3);
+initfig('No of constraints used', 6);
 hs1 = plot(no_cons_used_ACCA, 'color', green);
 
 uistack(fig);

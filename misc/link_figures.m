@@ -9,7 +9,7 @@ function link_figures(basedir, epsdir)
     end
     
     if nargin < 2
-        epsdir = '~/Dropbox/TU/Afstuderen/Ole/tex/main/presentation/img';
+        epsdir = '~/Dropbox/TU/Afstuderen/Ole/tex/main/report/img';
     end
     
     % call nested function

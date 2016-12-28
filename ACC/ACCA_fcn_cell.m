@@ -263,7 +263,7 @@ function [xstar, agents] = ACCA_fcn_cell(x_cell, deltas, f, cons_fcn, varargin)
                         end
 
                         % only use the constraints from infeasible deltas
-                        if residual < -options.tolerance || true % CHANGE THIS BACK
+                        if residual < -options.tolerance
                             C_i = [C_i; L(j, :)];
                             
                              % use previously defined cons_delta
