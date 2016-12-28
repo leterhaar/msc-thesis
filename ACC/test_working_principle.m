@@ -109,14 +109,27 @@ xstar = values_cell(x_cell);
 % retrieve only active constraints
 assign_cell(x_cell, xstar);
 residuals = check(C);
-active_cons = C(abs(residuals) < tol);
-fprintf('AC: Removed %d constraints (%2.0f%%)\n', length(residuals)-length(active_cons), (length(residuals)-length(active_cons))/length(residuals)*100);
+%%
+tols = logspace(-6,0);
+maxdiff = zeros_like(tols);
+for i = 1:length(tols)
+    active_cons = C(abs(residuals) < tols(i));
+    fprintf('AC with tolerance %2.e: Removed %d constraints (%2.0f%%)\n', tols(i), length(residuals)-length(active_cons), (length(residuals)-length(active_cons))/length(residuals)*100);
 
-% optimize again, using only active contraints
-status = optimize(active_cons, Obj, ops);
-assert(not(status.problem), status.info);
-xstar2 = values_cell(x_cell);
+    % optimize again, using only active contraints
+    status = optimize(active_cons, Obj, ops);
+    assert(not(status.problem), status.info);
+    xstar2 = values_cell(x_cell);
 
-% compare
-[close, maxdiff] = all_close(xstar, xstar2, 1e-3);
-verify(close, 'Not close: %g', maxdiff);
+    % compare
+    [close, maxdiff(i)] = all_close(xstar, xstar2, 1e-3);
+    verify(close, 'Not close: %g', maxdiff(i));
+end
+%% plot 
+initfig('Tolerance and optimality',2);
+hold off
+loglog(tols, maxdiff, 'o-');
+grid on
+xlabel('Tolerance');
+ylabel('||x-x^*||_\infty');
+title('Tolerance and optimality');
