@@ -21,13 +21,17 @@ tol = 1e-3;
 % load network and wind models
 ac = AC_model('case14a');
 ac.set_WPG_bus(9);
-wind = wind_model(ac, N_t, 0.9);
 
+wind = wind_model(ac, N_t, 0.9);
 % generate a number of scenarios
 wind.generate(N);
 
 % optimization settings
+<<<<<<< HEAD
 ops = sdpsettings('solver', 'mosek', 'verbose', 1, 'debug', 1);
+=======
+ops = sdpsettings('solver', 'mosek', 'verbose', 1);
+>>>>>>> 81c26f3d0f291cc0c9c467791911fe85755aeb85
 
 % connectivity matrix
 G = ones(N)-diag(ones(N,1));
@@ -153,7 +157,11 @@ plot(feasibility_ACCA, 'color', green);
 ylabel('% violated');
 xlabel('iterations');
 
+<<<<<<< HEAD
+initfig('ACC timing', 6);
+=======
 initfig('ACC timing', 5);
+>>>>>>> 81c26f3d0f291cc0c9c467791911fe85755aeb85
 ax = subplot(211);
 grid on
 hold on
@@ -169,7 +177,11 @@ plot(optimizations_run_ACCA, 'color', green);
 ylabel('Optimizations run');
 xlabel('Iteration');
 
+<<<<<<< HEAD
+initfig('No of constraints used', 5);
+=======
 initfig('No of constraints used', 6);
+>>>>>>> 81c26f3d0f291cc0c9c467791911fe85755aeb85
 hs1 = plot(no_cons_used_ACCA, 'color', green);
 
 uistack(fig);
