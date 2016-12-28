@@ -20,14 +20,14 @@ t = 1; % timestep used for this demonstration (todo: add for everything)
 
 % load network and wind models
 ac = AC_model('case14a');
-ac.set_WPG_bus(10);
+ac.set_WPG_bus(9);
 wind = wind_model(ac, N_t, 0.9);
 
 % generate a number of scenarios
 wind.generate(N);
 
 % optimization settings
-ops = sdpsettings('solver', 'mosek', 'verbose', 0);
+ops = sdpsettings('solver', 'mosek', 'verbose', 1, 'debug', 1);
 
 % connectivity matrix
 G = ones(N)-diag(ones(N,1));
@@ -82,14 +82,15 @@ verify(all_close(xstar_cent, xstar_cent_using_delta), ...
 [xstar, agents_ACCA] = ACCA_fcn_cell(x_cell, deltas, objective_fcn, cons_fcn, ...
                              'default_constraint', default_constraints,...
                              'residuals', residuals,...
-                             'stepsize', @(k) 1e4,...
+                             'stepsize', @(k) 1/(k+1),...
                              'use_selector', true,...
                              'opt_settings', ops,...
+                             'tolerance', 1e-3,...
                              'connectivity', G,...
                              'diameter', diam,...
                              'max_its', 15,...
                              'n_agents', N,...
-                             'verbose', 1,...
+                             'verbose', 0,...
                              'debug', 1,...
                              'x0', []);
 %%                         
@@ -134,7 +135,7 @@ for i = 1:N
 end
 
 %% plot
-fig = initfig('ACC iterations', 4);
+fig = initfig('ACC iterations', 1);
 ax = subplot(211, 'YScale', 'log');
 grid on
 hold on
@@ -151,7 +152,7 @@ plot(feasibility_ACCA, 'color', green);
 ylabel('% violated');
 xlabel('iterations');
 
-initfig('ACC timing', 2);
+initfig('ACC timing', 6);
 ax = subplot(211);
 grid on
 hold on
@@ -167,7 +168,7 @@ plot(optimizations_run_ACCA, 'color', green);
 ylabel('Optimizations run');
 xlabel('Iteration');
 
-initfig('No of constraints used', 3);
+initfig('No of constraints used', 5);
 hs1 = plot(no_cons_used_ACCA, 'color', green);
 
 uistack(fig);

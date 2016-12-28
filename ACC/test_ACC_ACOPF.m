@@ -13,7 +13,7 @@ end
 
 %% load models
 N_t = 24;           % optimization horizon
-N = 20;             % number of scenarios used for optimization
+N = 50;             % number of scenarios used for optimization
 t = 1;              % timestep used for this demonstration (todo: add for everything)
 
 % load network and wind models
@@ -25,10 +25,11 @@ wind = wind_model(ac, N_t, 0.2);
 wind.generate(N);
 
 % optimization settings
-ops = sdpsettings('solver', 'mosek', 'verbose', 0);
+ops = sdpsettings('solver', 'mosek', 'verbose', 0, 'debug', 1);
 
 % connectivity matrix
-G = ones(N)-diag(ones(N,1));
+n_agents = 7;
+G = ones(n_agents)-diag(ones(n_agents,1));
 diam = 1;
 %% create objective and constraint functions
 
@@ -87,7 +88,7 @@ verify(all_close(xstar_cent, xstar_cent_using_delta), ...
                              'tolerance', 1e-3,...
                              'diameter', diam,...
                              'max_its', 10,...
-                             'n_agents', N,...
+                             'n_agents', n_agents,...
                              'verbose', 1,...
                              'debug', 1,...
                              'x0', []);
@@ -96,17 +97,17 @@ verify(AC_check(xstar, ac, wind, t) == 0, 'Infeasible solution');
 
 %% calculate convergence and feasibility
 K = length(agents_ACC(1).iterations);
-convergence_ACC = nan(K,N);
-feasibility_ACC = nan(K,N);
-time_per_iteration_ACC = nan(K,N);
+convergence_ACC = nan(K,n_agents);
+feasibility_ACC = nan(K,n_agents);
+time_per_iteration_ACC = nan(K,n_agents);
 optimal_objective = objective_fcn(xstar_cent);
 optimizations_run_ACC = zeros(K,1);
-no_cons_used_ACC = nan(K,N);
-no_cons_active = nan(K,N);
-p = progress('Checking constraints', N);
+no_cons_used_ACC = nan(K,n_agents);
+no_cons_active = nan(K,n_agents);
+p = progress('Checking constraints', n_agents);
 timing_ACC = zeros(K,1);
 
-for i = 1:N
+for i = 1:n_agents
     for k = 1:K
         % calculate difference with centralized objective
         convergence_ACC(k,i) = abs(agents_ACC(i).iterations(k).J ...
@@ -171,7 +172,7 @@ xlabel('Iteration');
 initfig('No of constraints', 3);
 hs1 = plot(no_cons_used_ACC, 'color', green);
 hs2 = plot(no_cons_active, 'color', blue);
-hs3 = plot(N*Ncons*ones(K,1), '--');
+hs3 = plot(ones(K,1)*length(C_all), '--');
 xlabel('Iteration');
 legend([hs1(1) hs2(2) hs3], '|L|', '|A|', '|C_{all}|');
 figure(fig);
