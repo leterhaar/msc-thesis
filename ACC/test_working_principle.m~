@@ -113,7 +113,6 @@ residuals = check(C);
 tols = logspace(-6,0, 10);
 maxdiff = zeros_like(tols);
 obj_diff = zeros_like(maxdiff);
-feasibility = zeros_like(maxdiff);
 central_obj = value(Obj);
 for i = 1:length(tols)
     active_cons = C(abs(residuals) < tols(i));
@@ -128,18 +127,12 @@ for i = 1:length(tols)
     [close, maxdiff(i)] = all_close(xstar, xstar2, 1e-3);
     obj_diff(i) = abs(value(Obj) - central_obj);
 %     verify(close, 'Not close: %g', maxdiff(i));
-
-    % check feasibility
-    assign_cell(x_cell, xstar2);
-    residuals2 = check(C);
-    feasibility(i) = sum(residuals < -1e-6) / length(residuals) * 100;
-    
 end
 %% plot 
 initfig('Tolerance and optimality',2);
 hold off
-semilogx(tols, maxdiff, 'o-');
+loglog(tols, obj_diff, 'o-');
 grid on
 xlabel('Tolerance');
-ylabel('% feasible');
-title('Tolerance and feasibility');
+ylabel('||x-x^*||_\infty');
+title('Tolerance and optimality');

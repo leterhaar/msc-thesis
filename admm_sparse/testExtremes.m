@@ -18,8 +18,8 @@ N = 200;      % number of scenarios used for optimization
 t = 1; % timestep used for this demonstration (todo: add for everything)
 
 % load network and wind models
-ac = AC_model('case14a');
-ac.set_WPG_bus(9);
+ac = AC_model('case_ieee30a');
+ac.set_WPG_bus(22);
 wind = wind_model(ac, N_t, 0.2);
 
 % generate a number of scenarios
@@ -131,7 +131,7 @@ end
 % solve problem with psd constraint on every scenario matrix variable
 tic
 status = optimize(C, Obj, ops);
-toc
+time_all = toc
 verify(not(status.problem), status.info);
 verify(not(any(check(C) < -1e-6)), 'Infeasible solution!');
 
@@ -239,7 +239,7 @@ end
 %% solve problem with psd constraint on every scenario matrix variable
 tic
 status = optimize(C, Obj, ops);
-toc
+time_extreme = toc
 verify(not(status.problem), status.info);
 verify(not(any(check(C) < -1e-6)), 'Infeasible solution!');
 
@@ -281,7 +281,7 @@ end
 Wf_all = Wsstar_all{1};
 Wf_extremes = Wsstar_extremes{1};
 %%
-var_names = {'Wf', 'Pg', 'X', 'Rus', 'Rds', 'dus', 'dds'};
+var_names = {'Obj', 'Wf', 'Pg', 'X', 'Rus', 'Rds', 'dus', 'dds'};
 i = 1;
 
 for i = 1:length(var_names) 
@@ -290,3 +290,5 @@ for i = 1:length(var_names)
        eval(['norm(' var_name '_all - ' var_name '_extremes, ''inf'');']));
 
 end
+
+fprintf('\n\nSpeedup: %g seconds (%.1fx)\n\n', time_all-time_extreme, time_all/time_extreme);

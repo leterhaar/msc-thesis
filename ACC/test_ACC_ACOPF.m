@@ -15,7 +15,7 @@ end
 N_t = 24;           % optimization horizon
 N = 500;             % number of scenarios used for optimization
 t = 1;              % timestep used for this demonstration (todo: add for everything)
-tol = 1e-3;
+tol = 1e-6;
 
 % load network and wind models
 ac = AC_model('case14a');
