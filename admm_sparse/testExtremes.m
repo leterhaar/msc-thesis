@@ -14,16 +14,17 @@ end
 
 %% load models
 N_t = 24;   % optimization horizon
-N = 200;      % number of scenarios used for optimization
+N = 50;      % number of scenarios used for optimization
 t = 1; % timestep used for this demonstration (todo: add for everything)
 
 % load network and wind models
-ac = AC_model('case_ieee30a');
-ac.set_WPG_bus(22);
+ac = AC_model('case14a');
+ac.set_WPG_bus(9);
 wind = wind_model(ac, N_t, 0.2);
 
 % generate a number of scenarios
 wind.dummy(N);
+wind_all = copy(wind);
 
 % add the forecast as a scenario
 wind.P_w = [wind.P_wf, wind.P_w];
@@ -292,3 +293,9 @@ for i = 1:length(var_names)
 end
 
 fprintf('\n\nSpeedup: %g seconds (%.1fx)\n\n', time_all-time_extreme, time_all/time_extreme);
+
+%% simulate and check
+[problem, info] = simulate_network(ac, wind_all, Wsstar_extremes{1}, dus_extremes, dds_extremes, t);
+if problem
+    fprintf([info '\n']);
+end

@@ -25,6 +25,8 @@ classdef wind_model < handle
         P_w;        % wind power scenarios
         P_wf;       % forecasted wind power
         P_m;        % wind power mismatch
+        P_mpos;     % positive wind power mismatch
+        P_mneg;     % negative wind power mismatch
     end
    
     
@@ -37,8 +39,8 @@ classdef wind_model < handle
         % Arguments
         % ---------
         % m : DC_model (to extract load profile)
-        % N_t : number of time steps
-        % wind_penetration : the share of power which is wind 
+        % N_t : number of time steps (default 24)
+        % wind_penetration : the share of power which is wind (default 0.2)
         %
         % Returns:
         % --------
@@ -48,6 +50,10 @@ classdef wind_model < handle
                 % share of WPG in network
                 if nargin < 3
                     wind_penetration = 0.2;
+                end
+                
+                if nargin < 2
+                    N_t = 24;
                 end
                 % wind power base
                 obj.P_b = wind_penetration * max(max(m.P_D)) * getScaleWP(1,1);
@@ -150,13 +156,25 @@ classdef wind_model < handle
         end
         
         function use_extremes(obj, t)
-        %% use only the minimal and maximal forecast value
+        %% use only the minimal and maximal value
             assert(~isempty(obj.P_w), 'Please generate scenarios first');
             
             [~, min_id] = min(obj.P_w(t, :));
             [~, max_id] = max(obj.P_w(t, :));
             obj.P_w = obj.P_w(:, [min_id, max_id]);
             obj.P_m = obj.P_m(:, [min_id, max_id]);
+        end
+        
+        function use_extremes_and_posneg(obj, t)
+        %% use the minimal and maximal and split into positive and negative
+            assert(not(isempty(obj.P_w)), 'Please generate scenarios first');
+            
+            [~, min_id] = min(obj.P_w(t, :));
+            [~, max_id] = max(obj.P_w(t, :));
+            obj.P_w = [obj.P_wf obj.P_w(:, [min_id, max_id])];
+            obj.P_m = [zeros(obj.N_t,1) obj.P_m(:, [min_id, max_id])];
+            obj.P_mpos = max(0, obj.P_m);
+            obj.P_mneg = min(0, obj.P_m);
         end
         
         function dummy(obj, N, min, max)

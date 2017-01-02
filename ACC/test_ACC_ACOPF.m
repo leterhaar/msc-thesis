@@ -13,9 +13,9 @@ end
 
 %% load models
 N_t = 24;           % optimization horizon
-N = 500;             % number of scenarios used for optimization
+N = 20;             % number of scenarios used for optimization
 t = 1;              % timestep used for this demonstration (todo: add for everything)
-tol = 1e-6;
+tol = 1e-4;
 
 % load network and wind models
 ac = AC_model('case14a');
@@ -24,12 +24,14 @@ wind = wind_model(ac, N_t, 0.2);
 
 % generate a number of scenarios
 wind.generate(N);
+% wind.use_extremes(t);
+% N = 2;
 
 % optimization settings
 ops = sdpsettings('solver', 'mosek', 'verbose', 0, 'debug', 1);
 
 % connectivity matrix
-n_agents = 7;
+n_agents = 5;
 G = ones(n_agents)-diag(ones(n_agents,1));
 diam = 1;
 %% create objective and constraint functions

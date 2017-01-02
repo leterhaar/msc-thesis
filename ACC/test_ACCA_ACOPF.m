@@ -15,7 +15,7 @@ end
 
 %% load models
 N_t = 24;   % optimization horizon
-N = 5;      % number of scenarios used for optimization
+N = 20;      % number of scenarios used for optimization
 t = 1; % timestep used for this demonstration (todo: add for everything)
 tol = 1e-3;
 % load network and wind models
@@ -25,9 +25,12 @@ wind = wind_model(ac, N_t, 0.9);
 
 % generate a number of scenarios
 wind.generate(N);
+wind_all = copy(wind);
+wind.use_extremes(t);
+N = 2;
 
 % optimization settings
-ops = sdpsettings('solver', 'mosek', 'verbose', 0 'debug', 1);
+ops = sdpsettings('solver', 'mosek', 'verbose', 0, 'debug', 1);
 
 % connectivity matrix
 G = ones(N)-diag(ones(N,1));
@@ -85,7 +88,7 @@ verify(all_close(xstar_cent, xstar_cent_using_delta), ...
                              'stepsize', @(k) 1/(k+1),...
                              'use_selector', true,...
                              'opt_settings', ops,...
-                             'tolerance', 1e-3,...
+                             'tolerance', 1e-6,...
                              'connectivity', G,...
                              'diameter', diam,...
                              'tolerance', tol,...
@@ -96,7 +99,6 @@ verify(all_close(xstar_cent, xstar_cent_using_delta), ...
                              'x0', []);
 %%                         
 verify(AC_check(xstar, ac, wind, t) == 0, 'Infeasible solution');
-
 %% calculate convergence and feasibility
 K = length(agents_ACCA(1).iterations);
 convergence_ACCA = nan(K,N);
