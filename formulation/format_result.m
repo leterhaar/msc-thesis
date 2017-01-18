@@ -55,9 +55,9 @@ function format_result(m, wind, t, decided_vars, R)
     for i = format_samples
         fprintf('%f\t', sum(R(:,i)));
     end
-    fprintf('\n\nP_D-P_wf\t%f\n  -P_m\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t', sum(m.P_D(t,:))-wind.P_wf(t));
+    fprintf('\n\nP_D-P_wf\t%f\n   P_m\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t', sum(m.P_D(t,:))-wind.P_wf(t));
     for i = format_samples
-        fprintf('%f\t', -wind.P_m(t, i));
+        fprintf('%f\t', wind.P_m(t, i));
     end
     fprintf(['\n-------------------------------------------------------------' repmat('------------', 1, N_samples) ' - \n']);
     fprintf('DIFFERENCE \t%f\t\t\t\t\t\t\t\t\t\t\t', sum(P_G) - (sum(m.P_D(t,:))-wind.P_wf(t)));
@@ -69,6 +69,7 @@ function format_result(m, wind, t, decided_vars, R)
 
     fprintf('\n\n\t\t\t\t\t\t\t\tAVERAGE ABSOLUTE DIFFERENCE : \t%f\n\n', meanabs(difference));
     rank_error = 0;
+    psd_error = 0;
     if isa(m, 'AC_model')
         % print rank Wf
         rank_wf = svd_rank(Wf_opt, 1e2);  % a gap of 100x 
@@ -76,7 +77,11 @@ function format_result(m, wind, t, decided_vars, R)
             %fprintf('\nRank W_f \t : %i\n', rank_wf);
         else
             rank_error = 1;
-            fprintf('\nRank W_f \t : %i\t(!)\n', rank_wf);
+            fprintf('Rank W_f \t : %i\t\t(!)\n', rank_wf);
+        end
+        if not(is_psd(Wf_opt))
+            psd_error = 1;
+            fprintf('W_f not PSD \t\t\t(!)\n');
         end
 
 
@@ -87,12 +92,17 @@ function format_result(m, wind, t, decided_vars, R)
                 %fprintf('Rank W_s %3i : %i\n', i, rank_ws);
             else
                 rank_error = 1;
-                fprintf('Rank W_s %3i : %i\t(!)\n', i, rank_ws);
+                fprintf('Rank W_s %3i : %i\t\t(!)\n', i, rank_ws);
             end
+            if not(is_psd(Ws_opt(:,:,i)))
+                psd_error = 1;
+                fprintf('W_s %3i not PSD \t\t(!)\n', i);
+            end
+
         end
 
-        if ~rank_error
-            fprintf('All tested W`s are rank 1\n')
+        if ~rank_error && ~psd_error
+            fprintf('All tested W`s are rank 1 and PSD\n')
         end
     end
 

@@ -14,11 +14,11 @@ end
 
 %% load models
 N_t = 24;   % optimization horizon
-N = 50;      % number of scenarios used for optimization
+N = 10;      % number of scenarios used for optimization
 t = 1; % timestep used for this demonstration (todo: add for everything)
 
 % load network and wind models
-ac = AC_model('case14a');
+ac = AC_model('case9');
 ac.set_WPG_bus(9);
 wind = wind_model(ac, N_t, 0.2);
 
@@ -31,7 +31,8 @@ wind.P_w = [wind.P_wf, wind.P_w];
 wind.P_m = [zeros(N_t, 1), wind.P_m];
 
 % optimization settings
-ops = sdpsettings('solver', 'mosek', 'verbose', 1);
+ops = sdpsettings('solver', 'mosek', 'verbose', 1, 'debug', 1);
+
 %% define optimization variables and formulate objective
 
 % define Xs \in S^(2n)
@@ -105,6 +106,20 @@ for i = 1:N+1
                 sprintf('Vbus | s%2i | b%2i', i, k)];
     end
     
+    % loop over lines and enforce line flow limits
+    for l = 1:ac.N_l
+        
+        % if not set, don't introduce extra constraints
+        if ac.S_max(l) == 0
+            continue
+        end
+        
+        C = [C; [-(ac.S_max(l))^2, trace(ac.Y_lm(l) * Ws{i}), trace(ac.Ybar_lm(l) * Ws{i}); ...
+                 trace(ac.Y_lm(l) * Ws{i}), -1, 0; ...
+                 trace(ac.Ybar_lm(l) * Ws{i}), 0, -1] <= 0];
+    end
+    
+    
     if i > 1
         % reserve balancing constraints
         for j = 1:ac.N_G
@@ -128,7 +143,7 @@ for i = 1:N+1
     end
     
 end
-%% Solve
+% Solve
 % solve problem with psd constraint on every scenario matrix variable
 tic
 status = optimize(C, Obj, ops);
@@ -142,7 +157,7 @@ Rds_all = value(R_ds);
 dus_all = value(d_us);
 dds_all = value(d_ds);
 alpha_all = value(alpha);
-Obj_all = value(Obj2);
+Obj_all = value(Obj);
 
 for i = 1:N+1
     verify(svd_rank(Wsstar_all{i}) == 1, 'X for s%i not rank 1', i);
@@ -214,6 +229,19 @@ for i = 1:N+1
                 sprintf('Vbus | s%2i | b%2i', i, k)];
     end
     
+    % loop over lines and enforce line flow limits
+    for l = 1:ac.N_l
+        
+        % if not set, don't introduce extra constraints
+        if ac.S_max(l) == 0
+            continue
+        end
+        
+        C = [C; [-(ac.S_max(l))^2, trace(ac.Y_lm(l) * Ws{i}), trace(ac.Ybar_lm(l) * Ws{i}); ...
+                 trace(ac.Y_lm(l) * Ws{i}), -1, 0; ...
+                 trace(ac.Ybar_lm(l) * Ws{i}), 0, -1] <= 0];
+    end
+    
     if i > 1
         % reserve balancing constraints
         for j = 1:ac.N_G
@@ -273,12 +301,6 @@ for k = 1:ac.N_b
     Pg_extremes(k) = trace(ac.Y_k(k)*Wsstar_extremes{1}) + ac.P_D(t, k) - ac.C_w(k) * wind.P_wf(t);
 end
 
-% verify(all_close(Pg_all, Pg_extremes), 'Pg not close: %4e', norm(Pg_all - Pg_extremes, 'inf'));
-% verify(all_close(Rus_extremes, Rus_all, 1e-5), 'Rus not close: %4e', norm(Rus_extremes-Rus_all, 'inf'));
-% verify(all_close(Rds_extremes, Rds_all, 1e-5), 'Rds not close: %4e', norm(Rds_extremes-Rds_all, 'inf'));
-% verify(all_close(dus_extremes, dus_all, 1e-4), 'dus not close: %4e', norm(dus_extremes-dus_all, 'inf'));
-% verify(all_close(dds_extremes, dds_all, 1e-4), 'dds not close: %4e', norm(dds_extremes-dds_all, 'inf'));
-
 Wf_all = Wsstar_all{1};
 Wf_extremes = Wsstar_extremes{1};
 %%
@@ -287,7 +309,7 @@ i = 1;
 
 for i = 1:length(var_names) 
     var_name = var_names{i};
-    fprintf('%s & %e\n',var_name, ...
+    fprintf('%s\t : \t %e\n',var_name, ...
        eval(['norm(' var_name '_all - ' var_name '_extremes, ''inf'');']));
 
 end

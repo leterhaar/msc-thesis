@@ -1,4 +1,4 @@
-function [flag, info] = simulate_network(ac, wind, Wf, dus, dds, t)
+function [flag, info] = simulate_network(ac, wind, Wf, dus, dds, t, verbose, tol)
 % [flag, info] = simulate_network(ac, wind, Wf, dus, dds, t)
 % simulates the behaviour of a network and checks constraints
 %
@@ -9,7 +9,9 @@ function [flag, info] = simulate_network(ac, wind, Wf, dus, dds, t)
 % Wf    : squared bus voltages for forecasted scenario
 % dus   : ACG upspinning distribution vector
 % dds   : ACG downspinning distribution vector
-% t     : time 
+% t     : time
+% verbose : verbose flag, optional (1 = verbose, 0 = silent) 
+% tol   : tolerance for residuals
 % 
 % RETURNS
 % =======
@@ -17,13 +19,25 @@ function [flag, info] = simulate_network(ac, wind, Wf, dus, dds, t)
 % info  : string with information about where violation occured
 
     % check types of input
-    check_class({ac, wind, Wf, dus, dds}, {'AC_model', 'wind_model', ...
+    check_class({ac, wind, Wf, dus, dds}, {'AC_model', 'wind_model|struct', ...
                                             'double', 'double', 'double'})
     
+    info = '';
+    flag = 0;
     % check deterministic constraints
     j =  0;
     g = nan(ac.N_b * 6,1);
-    tol = 1e-6;
+    if nargin < 8
+        tol = 1e-4;
+    end
+    
+    if nargin < 7
+        verbose = true;
+    end
+    
+    if verbose
+        fprintf('\nSIMULATING SOLUTION\n===================\nForecast: \t\t');
+    end
     for k = 1:ac.N_b
         
         % P_inj upper (1) 
@@ -69,15 +83,22 @@ function [flag, info] = simulate_network(ac, wind, Wf, dus, dds, t)
 
     end
     if any(g > tol) 
+        if verbose
+            fprintf('fail, infeasible (%g)\n', -max(g));
+        end
         flag = 1;
-        info = 'Not satisfying deterministic constraints';
-        return
+        info = [info ' | Not satisfying deterministic constraints'];
+    elseif verbose
+        fprintf('OK\n');
+    end
+    if verbose
+        fprintf('-------------------\n');
     end
     
     % check for every scenario if a feasible solution is possible
     Ws = sdpvar(2*ac.N_b);
-    Pm_pos = sdpvar(ac.N_w, 1, 'full'); % = max(0, P_m)
-    Pm_neg = sdpvar(ac.N_w, 1, 'full'); % = max(0, -P_m)
+    Pm_pos = sdpvar(1, 1, 'full'); % = max(0, P_m)
+    Pm_neg = sdpvar(1, 1, 'full'); % = min(0, P_m)
     
     % refbus angle constraints
     refbus_index = ac.refbus + ac.N_b;
@@ -85,59 +106,100 @@ function [flag, info] = simulate_network(ac, wind, Wf, dus, dds, t)
             
     % psd constraints
     C = [C; Ws >= 0];
-    
-    for k = 1:ac.N_b
-        % real power injection limits
-        C = [C; ac.P_min(k) - ac.P_D(t, k) + ac.C_w(k)*(wind.P_wf(t)+Pm_pos+Pm_neg) <= ...
-                trace(Ws * ac.Y_k(k)) <= ...
-                ac.P_max(k) - ac.P_D(t, k) + ac.C_w(k)*(wind.P_wf(t)+Pm_pos+Pm_neg)];
+    try 
+%         for k = 1:ac.N_b
+%             % real power injection limits
+%             C = [C; ac.P_min(k) - ac.P_D(t, k) + ac.C_w(k)*(wind.P_wf(t)+Pm_pos+Pm_neg) - tol <= ...
+%                     trace(Ws * ac.Y_k(k)) <= ...
+%                     ac.P_max(k) - ac.P_D(t, k) + ac.C_w(k)*(wind.P_wf(t)+Pm_pos+Pm_neg) + tol];
+% 
+%             % reactive power injection limits
+%             C = [C; ac.Q_min(k) - ac.Q_D(t, k) - tol <= ...
+%                     trace(Ws * ac.Ybar_k(k)) <= ...
+%                     ac.Q_max(k) - ac.Q_D(t, k) + tol];
+% 
+%             % voltage magnitude limits
+%             C = [C; (ac.V_min(k))^2 - tol <= ...
+%                     trace(Ws * ac.M_k(k)) <= ...
+%                     (ac.V_max(k))^2 + tol];
+%         end
+        C = [C; feasibleW(Ws, wind.P_wf(t) + Pm_pos + Pm_neg)];
 
-        % reactive power injection limits
-        C = [C; ac.Q_min(k) - ac.Q_D(t, k) <= ...
-                trace(Ws * ac.Ybar_k(k)) <= ...
-                ac.Q_max(k) - ac.Q_D(t, k)];
+        for j = 1:ac.N_G
+
+            % bus index
+            k = ac.Gens(j);
+
+            % relate W_s and W_f through d_ds and d_us
+            C = [C; abs(trace((Ws - Wf) * ac.Y_k(k)) ...
+                    - ac.C_w(k)*(Pm_pos+Pm_neg) ...
+                    + dus(j) * Pm_neg ...
+                    + dds(j) * Pm_pos) <= tol];        
+        end
         
-        % voltage magnitude limits
-        C = [C; (ac.V_min(k))^2 <= ...
-                trace(Ws * ac.M_k(k)) <= ...
-                (ac.V_max(k))^2];
+        % lines flows
+        for l = 1:ac.N_l
+            C = [C; trace(ac.Y_lm(l) * Ws) <= ac.P_lmmax(l)];
+        end
+        
+        % define optimizer
+        ops = sdpsettings('solver', 'mosek', 'verbose', 0);
+%         ops = sdpsettings('solver', 'sedumi');
+        check_feasibility = optimizer(C, [], ops, {Pm_pos, Pm_neg}, Ws);
+    catch e
+        display(e.getReport());
+        flag = 3;
+        info = [info ' | Encountered error while simulating'];
     end
-    
-    for j = 1:ac.N_G
-        
-        % bus index
-        k = ac.Gens(j);
-        
-        % relate W_s and W_f through d_ds and d_us
-        C = [C; trace((Ws - Wf) * ac.Y_k(k)) ...
-                - ac.C_w(k)*(Pm_pos+Pm_neg) == ...
-                - dus(j) * Pm_neg ...
-                - dds(j) * Pm_pos];        
-    end
-    
-    % define optimizer
-    ops = sdpsettings('solver', 'mosek');
-    check_feasibility = optimizer(C, [], ops, {Pm_pos, Pm_neg}, Ws);
-    
     
     for i = 1:size(wind.P_m, 2)
+        if verbose
+            fprintf('Scenario %3i: \t', i);
+        end
         [Ws_opt, problem, msg] = check_feasibility(max(0, wind.P_m(t, i)), ...
                                min(0, wind.P_m(t, i)));
         if problem && strcmp(msg{:}, 'Infeasible problem ')
-            flag = 1;
-            info = sprintf('Not feasible for scenario %i\n%s', i, msg{:});
-            return
+            assign(Ws, Ws_opt);
+            smallest_res = min(check(C));
+            if smallest_res < -tol || isnan(smallest_res)
+                flag = 1;
+                info = [info ' | ' sprintf('Not feasible for scenario %i\n', i)];
+                if verbose
+                    fprintf('fail, infeasible (%e)\n', smallest_res);
+                end
+            end
         elseif problem
-            warning(['Problem optimizing: ' msg{:}]);
-        end
-        
-        if not(svd_rank(Ws_opt, 1e2) == 1)
-            flag = 1;
-            info = sprintf('Ws for scenario %i not rank 1', i);
-            return
+            
+            assign(Ws, Ws_opt);
+            smallest_res = min(check(C));
+            if smallest_res < -tol || isnan(smallest_res)
+                flag = 1;
+                info = [info ' | ' sprintf('Not feasible for scenario %i', i)];
+                if verbose
+                    fprintf('fail, infeasible (%e) and %s\n', smallest_res, msg{:});
+                end
+            elseif verbose
+                fprintf(['OK, solver returned ''' msg{:} '\b''\n']);
+            end
+        else
+            rank_Ws = svd_rank(Ws_opt, 1e2);
+            if not(rank_Ws == 1)
+                flag = 1;
+                info = [info ' | ' sprintf('Ws for scenario %i not rank 1', i)];
+                if verbose
+                    fprintf('fail, Ws not rank \n');
+                end
+            elseif verbose
+                fprintf('OK\n');
+            end
         end
     end
-    
-    flag = 0;
-    info = 'Checked, no problem';
+    if verbose
+        fprintf('===================\n\n');
+    end
+    if not(flag)
+        info = 'Checked, no problem';
+    else
+        info = info(4:end);
+    end
 end

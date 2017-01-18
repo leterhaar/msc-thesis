@@ -24,6 +24,11 @@ ax = gca;
 % ax.YLabel.FontSize = 18;
 set(h, 'defaultLineLineWidth', 2)
 title(name);
+parts = strsplit(name, 'vs');
+if length(parts) == 2
+    xlabel(parts{2});
+    ylabel(parts{1});
+end
 
 % Presentation colors
 % assignin('caller', 'blue', [36 55 58]/255);

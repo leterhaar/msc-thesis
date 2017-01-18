@@ -15,7 +15,7 @@ end
 N_t = 24;           % optimization horizon
 N = 20;             % number of scenarios used for optimization
 t = 1;              % timestep used for this demonstration (todo: add for everything)
-tol = 1e-4;
+tol = 1e-6;
 
 % load network and wind models
 ac = AC_model('case14a');
@@ -24,14 +24,14 @@ wind = wind_model(ac, N_t, 0.2);
 
 % generate a number of scenarios
 wind.generate(N);
-% wind.use_extremes(t);
-% N = 2;
+wind.use_extremes(t);
+N = 2;
 
 % optimization settings
 ops = sdpsettings('solver', 'mosek', 'verbose', 0, 'debug', 1);
 
 % connectivity matrix
-n_agents = 5;
+n_agents = N;
 G = ones(n_agents)-diag(ones(n_agents,1));
 diam = 1;
 %% create objective and constraint functions
@@ -123,7 +123,7 @@ for i = 1:n_agents
         infeasible = 0;
         for s = 1:N
             residuals = -AC_g(agents_ACC(i).iterations(k).x, ac, wind.slice(s), t);
-            infeasible = infeasible + (sum(residuals < -tol) / length(residuals) / N * 100);
+            infeasible = infeasible + (sum(residuals < -2*tol) / length(residuals) / N * 100);
         end
         feasibility_ACC(k,i) = infeasible;
         
@@ -147,11 +147,11 @@ for i = 1:n_agents
 end
 
 %% plot
-fig = initfig('ACC iterations', 4);
+fig = initfig('ACC iterations', 5);
 ax = subplot(211, 'YScale', 'log');
 grid on
 hold on
-hs1 = plot(convergence_ACC, '-x', 'color', green);
+hs1 = plot(convergence_ACC, '-x');
 ylabel('|f(x_k^i) - f(x^*) |')
 title(sprintf('ACC convergence for AC OPF %s with %i scenarios', ac.model_name, N));
 
@@ -159,35 +159,36 @@ ax2 = subplot(212);
 linkaxes([ax ax2], 'x');
 grid on
 hold on
-plot(feasibility_ACC, '-x', 'color', green);
+plot(feasibility_ACC, '-x');
 
 ylabel('% violated');
 xlabel('iterations');
-
-initfig('ACC timing', 2);
-ax = subplot(211);
-grid on
-hold on
-hs1 = plot(time_per_iteration_ACC, 'o', 'color', green);
-plot(timing_ACC, 'o-', 'color', green);
-ylabel('Time per iteration');
-
-ax2 = subplot(212);
-linkaxes([ax ax2], 'x');
-grid on
-hold on
-plot(optimizations_run_ACC, 'color', green);
-ylabel('Optimizations run');
-xlabel('Iteration');
-
-initfig('No of constraints', 3);
-hs1 = plot(no_cons_used_ACC, 'color', green);
-hs2 = plot(no_cons_active, 'color', blue);
-hs3 = plot(ones(K,1)*length(C_all), '--');
-xlabel('Iteration');
-legend([hs1(1) hs2(2) hs3], '|L|', '|A|', '|C_{all}|');
-figure(fig);
-uistack(fig);
+% 
+% initfig('ACC timing', 2);
+% ax = subplot(211);
+% grid on
+% hold on
+% hs1 = plot(time_per_iteration_ACC, 'o');
+% plot(timing_ACC, 'o-', 'color', green);
+% ylabel('Time per iteration');
+% 
+% ax2 = subplot(212);
+% linkaxes([ax ax2], 'x');
+% grid on
+% hold on
+% plot(optimizations_run_ACC, 'color', green);
+% ylabel('Optimizations run');
+% xlabel('Iteration');
+% 
+% initfig('No of constraints', 3);
+% hs1 = plot(no_cons_used_ACC);
+% hs2 = plot(no_cons_active(:,1), ':', 'color', hs1(1).Color);
+% plot(no_cons_active(:,2), ':', 'color',  hs1(2).Color);
+% hs3 = plot(ones(K,1)*length(C_all), '--');
+% xlabel('Iteration');
+% legend([hs1(1) hs2(1) hs3], '|L|', '|A|', '|C_{all}|');
+% figure(fig);
+% uistack(fig);
 
 %% make assertions
 verify(all_close(xstar, xstar_cent, 1e-4), 'Not optimal');

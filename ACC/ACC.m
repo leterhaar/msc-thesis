@@ -287,19 +287,19 @@ function [xstar, agents] = ACC(x_sdp, delta_sdp, deltas, f, constraints, varargi
                     
                     % check feasibility of of the new solution
                     if isempty(options.residuals) % use YALMIP check
-                        assign(x_sdp, agents(i).iterations(k).x);
+                        assign(x_sdp, agents(i).iterations(k+1).x);
                         assign(delta_sdp, L(j, 2:end));
                         residual = check(constraints(L(j, 1)));
                         
                     elseif options.use_selector % use h(x, delta, j) >= 0
                         residual = options.residuals(...
-                                                agents(i).iterations(k).x, ...
+                                                agents(i).iterations(k+1).x, ...
                                                 L(j, 2:end), L(j, 1));
                                             
                     else % use residual function h(x, delta) >= 0
                         % get all residuals corresponding to the delta
                         residuals = options.residuals(...
-                                                agents(i).iterations(k).x, ...
+                                                agents(i).iterations(k+1).x, ...
                                                 L(j, 2:end));
                         % filter out the residual of interest
                         residual = residuals(L(j,1));

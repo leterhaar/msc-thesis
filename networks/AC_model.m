@@ -16,6 +16,8 @@ classdef AC_model < handle
         Q_min;           % Reactive injected power min
         V_min;           % Minimum bus voltage [p.u.]
         V_max;           % Maximum bus voltage [p.u.]
+        S_max;           % Line flow limits
+        P_lmmax;         % Real line flow limits
         Y;               % Complex nodal admittance matrix (N_b x N_b)
         P_D;             % Real power demanded [MW]
         Q_D;             % Reactive power demanded [MVAr]
@@ -42,7 +44,7 @@ classdef AC_model < handle
                 obj.model_name = model_name;
             end
             
-            filename = ['../networks/' obj.model_name '.mat'];
+            filename = ['../networks/' obj.model_name '-saved.mat'];
             if exist(filename, 'file')
                 saved_model = load(filename, 'obj');
                 
@@ -196,8 +198,13 @@ classdef AC_model < handle
             % downspinning costs are the less than upspinning costs
             obj.c_ds = 0.1*obj.c_us;
             
+            % define line flow limits (can be zero)
+            obj.S_max = mpc.branch(:, 6) ./ baseMVA;
+            
+            obj.P_lmmax = ones(obj.N_l,1);
+            
             % save the model
-            save(['../networks/' obj.model_name '.mat'], 'obj');
+            save(['../networks/' obj.model_name '-saved.mat'], 'obj');
             disp(['Saved ' obj.model_name ' for future use']);
         
         end
@@ -263,9 +270,10 @@ classdef AC_model < handle
             m = obj.from_to(k, 2);
             e_l = obj.e(l);
             e_m = obj.e(m);
+            shunt = 0; % not available through MATPOWER
             
             y_lm = -obj.Y(l,m);
-            Y_lm = (conj(y_lm) + y_lm) * e_l * e_l' - (y_lm) * e_l * e_m';
+            Y_lm = (shunt + y_lm) * e_l * e_l' - (y_lm) * e_l * e_m';
             Ylm = 0.5 * [real(Y_lm + Y_lm.') imag(Y_lm.' - Y_lm)
                          imag(Y_lm - Y_lm.') real(Y_lm + Y_lm.')];
         end
@@ -277,9 +285,10 @@ classdef AC_model < handle
             m = obj.from_to(k, 2);
             e_l = obj.e(l);
             e_m = obj.e(m);
+            shunt = 0; % not available through MATPOWER
             
             y_lm = -obj.Y(l,m);
-            Y_lm = (conj(y_lm) + y_lm) * e_l * e_l' - (y_lm) * e_l * e_m';
+            Y_lm = (shunt + y_lm) * e_l * e_l' - (y_lm) * e_l * e_m';
             Ybarlm = -0.5 * [imag(Y_lm + Y_lm.') real(Y_lm - Y_lm.')
                              real(Y_lm.' - Y_lm) imag(Y_lm + Y_lm.')];
         end
@@ -379,7 +388,12 @@ classdef AC_model < handle
             set(gca, 'YTick', []);
             title(['Schematic overview of ' obj.model_name ' network']);
 
-        end      
+        end
+        
+        function res = Y_(obj, k)
+            % shortcut for Y_k(k)
+            res = obj.Y_k(k);
+        end
     end
 end
 

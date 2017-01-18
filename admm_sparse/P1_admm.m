@@ -5,7 +5,7 @@ addpath('../wind');
 addpath('../formulation');
 
 %% Load models
-ac = AC_model('case14');
+ac = AC_model('case14a');
 ac.set_WPG_bus(9);
 
 N_t = 24;

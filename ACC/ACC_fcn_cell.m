@@ -97,11 +97,6 @@ function [xstar, agents] = ACC_fcn_cell(x_cell, deltas, f, cons_fcn, varargin)
     assert(N >= m, ...
             'Number of agents can not be larger than number of scenarios');
     
-    
-    if isempty(options.opt_settings.solver)
-        warning('Calling optimizer with no solver specified!');
-    end
-    
     % add helper path
     if not(exist('zeros_like', 'file'))
         addpath('../misc/');
@@ -231,13 +226,9 @@ function [xstar, agents] = ACC_fcn_cell(x_cell, deltas, f, cons_fcn, varargin)
                     % build constraint set
                     C_all = options.default_constraint; 
                     for j = 1:size(L,1)
-                            
-                        % use previously defined cons_delta
-                        if isempty(options.residuals)
-                            C_all = [C_all, cons_delta{L(j,1)}];
-
+                        
                         % use cons_fcn with selector
-                        elseif options.use_selector
+                        if options.use_selector
                             C_all = [C_all, cons_fcn(x_cell, ...
                                                          L(j, 2:end),...
                                                          L(j, 1))];
@@ -259,7 +250,7 @@ function [xstar, agents] = ACC_fcn_cell(x_cell, deltas, f, cons_fcn, varargin)
                     % store status
                     if debug
                         agents(i).iterations(k+1).info.optimized = 1;
-                        agents(i).iterations(k+1).info.num_cons = size(L,1);
+                        agents(i).iterations(k+1).info.num_cons = length(C_all) - length(options.default_constraint);
                     end
                     
                 else
@@ -278,26 +269,35 @@ function [xstar, agents] = ACC_fcn_cell(x_cell, deltas, f, cons_fcn, varargin)
                 % store active constraints
                 agents(i).iterations(k+1).L = L;
                 agents(i).iterations(k+1).active_deltas = [];
+                assign_cell(x_cell, agents(i).iterations(k+1).x);
+
                 for j = 1:size(L,1)
                     
                     % check feasibility of of the new solution
                     if isempty(options.residuals) % use YALMIP check
                         cons_delta = cons_fcn(x_cell, L(j, 2:end));
-                        assign_cell(x_cell, agents(i).iterations(k+1).x);
                         residual = check(cons_delta(L(j, 1)));
                         
                     elseif options.use_selector % use h(x, delta, j) >= 0
                         residual = options.residuals(...
-                                                agents(i).iterations(k).x, ...
+                                                agents(i).iterations(k+1).x, ...
                                                 L(j, 2:end), L(j, 1));
                                             
                     else % use residual function h(x, delta) >= 0
                         % get all residuals corresponding to the delta
                         residuals = options.residuals(...
-                                                agents(i).iterations(k).x, ...
+                                                agents(i).iterations(k+1).x, ...
                                                 L(j, 2:end));
                         % filter out the residual of interest
                         residual = residuals(L(j,1));
+                    end
+                    
+                    if debug
+                        residual2 = check(cons_fcn(x_cell, L(j, 2:end), L(j, 1)));
+                        if abs(residual - residual2) > 1e-3
+                            cons_fcn(x_cell, L(j, 2:end), L(j, 1))
+                            keyboard
+                        end
                     end
 
                     if residual < options.tolerance && residual > -options.tolerance

@@ -228,7 +228,7 @@ function [xstar, agents] = ACCA_fcn_cell(x_cell, deltas, f, cons_fcn, varargin)
                         residual = residuals(L(j,1));
                     end
                     
-                    if residual < -options.tolerance;
+                    if residual < -options.tolerance
                         feasible_for_all = 0;
                         break
                     end
@@ -262,8 +262,9 @@ function [xstar, agents] = ACCA_fcn_cell(x_cell, deltas, f, cons_fcn, varargin)
                             residual = residuals(L(j,1));
                         end
 
-                        % only use the constraints from infeasible deltas
-                        if residual < -options.tolerance
+                        % only use the constraints from infeasible or
+                        % strict deltas
+                        if residual < options.tolerance % || true % REMOVE '|| true' FOR FULL ACCA
                             C_i = [C_i; L(j, :)];
                             
                              % use previously defined cons_delta
@@ -295,10 +296,12 @@ function [xstar, agents] = ACCA_fcn_cell(x_cell, deltas, f, cons_fcn, varargin)
                     % define objective and solve
                     alpha = options.stepsize(k);
                     Obj_consensus = f(x_cell);
+                    % UNCOMMENT BELOW FOR FULL ACCA
                     for l = 1:N_cell
                         Obj_consensus = Obj_consensus + 1/(2*alpha) * ...
                                             norm(x_cell{l}(:) - z{l}(:))^2;
                     end
+                    % UNCOMMENT ABOVE FOR FULL ACCA
                     status = optimize(C_all, Obj_consensus, ...
                                                      options.opt_settings);
                     assert(not(status.problem), status.info);
@@ -328,29 +331,30 @@ function [xstar, agents] = ACCA_fcn_cell(x_cell, deltas, f, cons_fcn, varargin)
                 
                 % store active constraints
                 agents(i).iterations(k+1).active_deltas = [];
+                assign_cell(x_cell, agents(i).iterations(k+1).x);
+
                 for j = 1:size(L,1)
                     
                     % check feasibility of of the new solution
                     if isempty(options.residuals) % use YALMIP check
                         cons_delta = cons_fcn(x_cell, L(j, 2:end));
-                        assign_cell(x_cell, agents(i).iterations(k+1).x);
                         residual = check(cons_delta(L(j, 1)));
                         
                     elseif options.use_selector % use h(x, delta, j) >= 0
                         residual = options.residuals(...
-                                                agents(i).iterations(k).x, ...
+                                                agents(i).iterations(k+1).x, ...
                                                 L(j, 2:end), L(j, 1));
                                             
                     else % use residual function h(x, delta) >= 0
                         % get all residuals corresponding to the delta
                         residuals = options.residuals(...
-                                                agents(i).iterations(k).x, ...
+                                                agents(i).iterations(k+1).x, ...
                                                 L(j, 2:end));
                         % filter out the residual of interest
                         residual = residuals(L(j,1));
                     end
 
-                    if residual < options.tolerance && residual > -options.tolerance;
+                    if residual < options.tolerance && residual > -options.tolerance
                         agents(i).iterations(k+1).active_deltas = [
                             agents(i).iterations(k+1).active_deltas;
                             L(j, :)];
@@ -401,6 +405,7 @@ function [xstar, agents] = ACCA_fcn_cell(x_cell, deltas, f, cons_fcn, varargin)
         if debug
             fprintf('\n%s', e.getReport());
             keyboard;
+            xstar = agents(1).iterations.x;
         else
             rethrow(e);
         end

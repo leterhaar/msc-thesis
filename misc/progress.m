@@ -80,5 +80,10 @@ classdef progress < handle
             perc = min(obj.i / obj.N * 100, 100);
             obj.print_percentage(perc);
         end
+        
+        function finish(obj)
+            obj.i = obj.N;
+            obj.print_percentage(100);
+        end
     end
 end

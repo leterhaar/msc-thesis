@@ -39,6 +39,7 @@ while true
             newname = input('New folder name? ', 's');
             if ~isempty(newname)
                 mkdir(newname);
+                cd(newname);
             end
         elseif k+1 <= length(dirs);
             cd([pwd '/' list(dirs(k+1)).name '/']);

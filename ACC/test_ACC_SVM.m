@@ -11,7 +11,7 @@ opt_settings = sdpsettings('verbose', 0, 'solver', 'gurobi');
                    'diameter', 2, ...
                    'residuals', svm.residual_delta);
 
-%% calculate convergence and feasibility
+%% calculate convergence and feasibility 
 m = length(agents);
 K = length(agents(1).iterations);
 
