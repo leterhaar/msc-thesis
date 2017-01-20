@@ -1,4 +1,8 @@
 function hoeveel_code_heb_ik_al_geschreven(dirname)
+% hoeveel_code_heb_ik_al_geschreven(dirname)
+%
+% loops recursively over all subfolders in [dirname]
+% and checks the number of .m files and file sizes
 
     if nargin < 1 
         dirname = '~/Dropbox/TU/Afstuderen/Ole/code';

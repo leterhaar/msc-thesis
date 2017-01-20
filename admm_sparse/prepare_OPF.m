@@ -18,8 +18,8 @@ for j = 1:ac.N_G
     k = ac.Gens(j);
     Y_sum = Y_sum + ac.c_us(j) * ac.Y_P(k);
 end
-M_0 = Y_sum;
-M_0 = (ac.Y + ac.Ystar) / 2;
+% M_0 = Y_sum;
+% M_0 = (ac.Y + ac.Ystar) ./ 2;
 assert(all(all(M_0 == M_0')))
 
 u_ = nan(0);
@@ -43,7 +43,7 @@ for k = 1:ac.N_b
     % reactive power injection limits
     l_(end+1) = ac.Q_min(k) - ac.Q_D(t, k);
     M_{end+1} = ac.Y_Q(k);
-    u_(end+1) = ac.Q_max(k)- ac.Q_D(t, k);
+    u_(end+1) = ac.Q_max(k) - ac.Q_D(t, k);
 %         spy(M{end})
 %         pause
 
@@ -88,7 +88,7 @@ N_0 = double(M_0 ~= 0);
 
 %% attempt to solve the program using YALMIP
 X = sdpvar(d, d, 'hermitian', 'complex');
-Obj = trace(M_0' * X);
+Obj = trace(M_0 * X);
 Cons = [];
 for s = 1:length(l_)
     if isa(trace(X * M_{s}), 'sdpvar')
@@ -103,7 +103,8 @@ ops = sdpsettings('verbose', 0, 'solver', 'mosek');
 status = optimize(Cons, Obj, ops);
 assert(not(status.problem), 'Primair probleem werkt niet: %s', status.info);
 value(Obj)
-Xopt_orig = zero_for_nan(value(X));
+Xopt_orig = (value(X));
+
 %% test in ADMM formulation
 p = length(l_);
 q = length(C_);
@@ -141,4 +142,9 @@ Xopt = zero_for_nan(value(X));
 [close, diff] = all_close(Xopt, Xopt_orig, 1e-4)
 
 save('data/14bus', 'M_0', 'M_', 'l_', 'u_', 'N_', 'N_0', 'C_', 'C', 'ac', 'Xopt', 'Xopt_orig');
+
+
+%% Checking again
+% Quickly check if the normal OPF problem is indeed feasible and 
+% has the same solution
 

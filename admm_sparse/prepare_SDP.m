@@ -1,4 +1,4 @@
-d = 10;
+d = 20;
 yalmip('clear');
 slack = 0;
 %% build system data matrices

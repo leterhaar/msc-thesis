@@ -8,7 +8,10 @@ if not(exist('svd_rank', 'file'))
 end
 load('data/14bus.mat')
 
-slack = 0;
+slack = 1e-4;
+u_ = u_ + slack;
+l_ = l_ - slack;
+
 
 % get dimensions from data
 d = size(M_0, 1);
@@ -20,7 +23,7 @@ it = struct();
 
 % initiate variables
 % Block 1
-X_init = ones(d) + sqrt(-1)*zeros(d);
+X_init = zeros(d);
 it.X = X_init;
 it.z_ = zeros(1,p);
 it.z_0 = 0;
@@ -47,13 +50,14 @@ it.Lambda_C_ = cell(q,1);
 it.pres = nan;
 it.energy = nan;
 it.obj = nan;
+it.obj2 = nan;
 k = 1;
 
 %% start iterations
-max_its = 5000;
+max_its = 100000;
 prog = progress('Running ADMM', max_its-1);
 while k < max_its
-    mu = 250;
+    mu = 1000;
     it(k+1).energy = 0;
     it(k+1).pres = 0; % primal residue
     
@@ -74,12 +78,12 @@ while k < max_its
     it(k+1).X = sparse_division(num, C, den);
     
     % update z_0
-    it(k+1).z_0 = trace(M_0' * it(k).X_N_0) - ((it(k).lambda_z_0 + 1)/mu);
-    
+    it(k+1).z_0 = real(trace(M_0' * it(k).X_N_0) - ((it(k).lambda_z_0 + 1)/mu));
+
     % update z_s
     for s = 1:p
         it(k+1).z_(s) = max(min(real(trace(M_{s}' * it(k).X_N_{s}) ...
-                                - (it(k).lambda_z_(s)/mu)), u_(s) + slack), l_(s) - slack);
+                                - (it(k).lambda_z_(s)/mu)), u_(s)), l_(s));
     end
     
     
@@ -89,8 +93,8 @@ while k < max_its
     for r = 1:q
         X_indef = it(k+1).X .* C_{r} + (it(k).Lambda_C_{r}/mu);
         it(k+1).X_C_{r} = project_PSD(X_indef, C_{r});
-        it(k+1).energy = it(k+1).energy + mu*norm(it(k+1).X_C_{r} - it(k).X_C_{r}, 'fro')^2;
-        it(k+1).pres = it(k+1).pres + norm(it(k+1).X .* C_{r} - it(k+1).X_C_{r}, 'fro')^2;
+%         it(k+1).energy = it(k+1).energy + mu*norm(it(k+1).X_C_{r} - it(k).X_C_{r}, 'fro')^2;
+%         it(k+1).pres = it(k+1).pres + norm(it(k+1).X .* C_{r} - it(k+1).X_C_{r}, 'fro')^2;
     end
     
     % update y_0 and X_N_0
@@ -110,8 +114,8 @@ while k < max_its
                         (it(k).Lambda_N_{s}/mu))))/(1+norm(M_{s}, 'fro')^2);
         it(k+1).X_N_{s} = N_{s} .* it(k+1).X + (it(k).Lambda_N_{s}/mu) + ...
                                                      (it(k+1).y_(s) * M_{s});
-        it(k+1).energy = it(k+1).energy + mu*norm(it(k+1).X_N_{s} - it(k).X_N_{s}, 'fro')^2;
-        it(k+1).pres = it(k+1).pres + norm(it(k+1).X .* N_{s} - it(k+1).X_N_{s}, 'fro')^2;
+%         it(k+1).energy = it(k+1).energy + mu*norm(it(k+1).X_N_{s} - it(k).X_N_{s}, 'fro')^2;
+%         it(k+1).pres = it(k+1).pres + norm(it(k+1).X .* N_{s} - it(k+1).X_N_{s}, 'fro')^2;
 
     end
     
@@ -121,14 +125,14 @@ while k < max_its
     for r = 1:q
         it(k+1).Lambda_C_{r} = it(k).Lambda_C_{r} + ...
                                mu * ((it(k+1).X .* C_{r}) - it(k+1).X_C_{r});
-        it(k+1).energy = it(k+1).energy + 1/mu * norm(it(k+1).Lambda_C_{r} - it(k).Lambda_C_{r}, 'fro')^2;
+%         it(k+1).energy = it(k+1).energy + 1/mu * norm(it(k+1).Lambda_C_{r} - it(k).Lambda_C_{r}, 'fro')^2;
     end
     
     % update Lambda_N_s
     for s = 1:p
         it(k+1).Lambda_N_{s} = it(k).Lambda_N_{s} + ...
                                mu * ((it(k+1).X .* N_{s}) - it(k+1).X_N_{s});
-        it(k+1).energy = it(k+1).energy + 1/mu * norm(it(k+1).Lambda_N_{s} - it(k).Lambda_N_{s}, 'fro')^2;
+%         it(k+1).energy = it(k+1).energy + 1/mu * norm(it(k+1).Lambda_N_{s} - it(k).Lambda_N_{s}, 'fro')^2;
     end
     
     % update Lambda_N_0
@@ -142,17 +146,17 @@ while k < max_its
                                mu * (it(k+1).z_(s) - ...
                                trace(M_{s}' * it(k+1).X_N_{s})));
     end
-    it(k+1).energy = it(k+1).energy + 1/mu * norm(it(k+1).lambda_z_ - it(k).lambda_z_)^2;
+%     it(k+1).energy = it(k+1).energy + 1/mu * norm(it(k+1).lambda_z_ - it(k).lambda_z_)^2;
     
     % update lambda_z_0
-    it(k+1).lambda_z_0 = it(k).lambda_z_0 + ...
+    it(k+1).lambda_z_0 = real(it(k).lambda_z_0 + ...
                                mu * (it(k+1).z_0 - ...
-                               trace(M_0' * it(k+1).X_N_0));
-    it(k+1).energy = it(k+1).energy + 1/mu * norm(it(k+1).lambda_z_0 - it(k).lambda_z_0)^2;
+                               trace(M_0' * it(k+1).X_N_0)));
+%     it(k+1).energy = it(k+1).energy + 1/mu * norm(it(k+1).lambda_z_0 - it(k).lambda_z_0)^2;
     
     % store objective
-    it(k+1).obj = real(trace(M_0 * it(k+1).X));
-    
+    it(k+1).obj = real(trace(M_0' * it(k+1).X_N_0));
+    it(k+1).obj2 = real(trace(M_0' * it(k+1).X));
     
     % update iteration number
     k = k + 1;
@@ -161,10 +165,10 @@ while k < max_its
 
     
     % check stopping criterion
-    if it(k).pres < 1e-10
-        prog.finish();
-        break;
-    end
+%     if it(k).pres < 1e-10
+%         prog.finish();
+%         break;
+%     end
 
     if k > 1
     % remove all items except X from memory to prevent crashing
@@ -201,8 +205,10 @@ title('Residuals');
 
 initfig('Objectives', 8);
 plot(real([it.obj]));
+plot(real([it.obj2]), '--')
 plot(ones(k,1)*real(trace(M_0 * Xopt)));
-legend('ADMM','Centralized');
+
+legend('ADMM', 'ADMM - obj2', 'Centralized');
 hold on; grid on; box on;
 
 %% test solution against original problem

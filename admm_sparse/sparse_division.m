@@ -6,4 +6,5 @@ function divided = sparse_division(D,C,E)
     C(C == 0) = nan;
     divided = divided ./ C;
     divided(isnan(divided)) = 0;
+    
 end

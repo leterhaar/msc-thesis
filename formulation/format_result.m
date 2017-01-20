@@ -108,7 +108,7 @@ function format_result(m, wind, t, decided_vars, R)
 
    
     fprintf('\nPlotting.');
-    h = figure(3);
+    h = figure(5);
     set(h, 'name', 'Generators');
     clf
     dock
