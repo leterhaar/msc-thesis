@@ -1,10 +1,10 @@
-d = 20;
+d = 5;
 yalmip('clear');
 slack = 0;
 %% build system data matrices
 
 M_0 = rhermsparse(d);
-M_0 = 0.5 * (M_0 + M_0');
+M_0 = -0.5 * (M_0 + M_0');
 
 u_ = nan(0);
 l_ = nan(0);
@@ -12,16 +12,16 @@ M_ = cell(0);
 C_ = cell(0);
 C = zeros(d);
 
-for i = 1:10
-    l_(end+1) = -rand;
-    u_(end+1) = rand;
-    M_{end+1} = rhermsparse(d);
+for i = 1:1
+    l_(end+1) = 5;
+    u_(end+1) = 10;
+    M_{end+1} = ones(d);
 end
-for i = 1:10
-    l_(end+1) = rand - slack ;
-    u_(end+1) = l_(end) + slack;
-    M_{end+1} = rhermsparse(d);
-end
+% for i = 1:10
+%     l_(end+1) = 10*rand - slack ;
+%     u_(end+1) = l_(end) + slack;
+%     M_{end+1} = rhermsparse(d);
+% end
 C_ = {ones(d)};
 C = ones(d);
 

@@ -5,7 +5,7 @@ if not(exist('AC_model', 'file'))
     addpath('../misc', '../networks', '../wind');
 end
 
-N = 5;
+N = 2;
 t = 15;
 tol = 1e-4;
 
@@ -350,12 +350,12 @@ C = [C, feasibleW(W_f, wind.P_wf)];
 C = [C, W_0 >= 0];
 C = [C, W_us >= 0];
 C = [C, W_ds >= 0];
-
+W_s = cell(N,1);
 for i = 1:N
-    W_s = W_0 + min(wind.P_w(t, i), wind.P_wf(t))*W_us + ...
+    W_s{i} = W_0 + min(wind.P_w(t, i), wind.P_wf(t))*W_us + ...
                 max(wind.P_w(t, i) - wind.P_wf(t), 0)*W_ds;
 
-    C = [C, feasibleW(W_s, wind.slice(i).P_w)];
+    C = [C, feasibleW(W_s{i}, wind.slice(i).P_w)];
     
     for j = 1:ac.N_G
         
@@ -363,7 +363,7 @@ for i = 1:N
         
         % Bound R between R_us and R_ds
         C = [C, -R_ds(j) ...
-             <= trace(ac.Y_k(k)*(W_s-W_f)) - ac.C_w(k)*wind.P_m(t, i) <= ...
+             <= trace(ac.Y_k(k)*(W_s{i}-W_f)) - ac.C_w(k)*wind.P_m(t, i) <= ...
                 R_us(j)];  
         if i == 1
             C = [C, trace(ac.Y_(k) * W_us) <= 0];

@@ -11,12 +11,22 @@ if not(exist('AC_f', 'file'))
     addpath('../networks');
 end
 
+
 %% load models
 N_t = 24;   % optimization horizon
 t = 1; % timestep used for this demonstration (todo: add for everything)
+N = 5;
 
 % load network and wind models
 ac = AC_model('case14a');
+ac.set_WPG_bus(9);
+wind = wind_model(ac, 24, 0.2);
+wind.generate(N);
+
+% add forecast as first scenario
+wind.P_m = [zeros(24,1) wind.P_m];
+wind.P_w = [wind.P_wf wind.P_w];
+
 
 % optimization settings
 ops = sdpsettings('solver', 'mosek');
@@ -180,7 +190,15 @@ for i = 1:N+1
     verify(is_psd(W_tree) == 1, 'submatrix tree not psd for s%2i: %g', i, min(eig(W_tree)));
 end
 
-verify(all_close(Rus_tree, Rus_whole, 1e-5), 'Rus not close: %g', norm(Rus_tree-Rus_whole, 'inf'));
-verify(all_close(Rds_tree, Rds_whole, 1e-5), 'Rds not close: %g', norm(Rds_tree-Rds_whole, 'inf'));
-verify(all_close(dus_tree, dus_whole, 1e-4), 'dus not close: %g', norm(dus_tree-dds_whole, 'inf'));
-verify(all_close(dds_tree, dds_whole, 1e-4), 'dds not close: %g', norm(dds_tree-dds_whole, 'inf'));
+verify(all_close(Rus_tree, Rus_whole, 1e-6), 'Rus not close: %g', norm(Rus_tree-Rus_whole, 'inf'));
+verify(all_close(Rds_tree, Rds_whole, 1e-6), 'Rds not close: %g', norm(Rds_tree-Rds_whole, 'inf'));
+verify(all_close(dus_tree, dus_whole, 1e-6), 'dus not close: %g', norm(dus_tree-dds_whole, 'inf'));
+verify(all_close(dds_tree, dds_whole, 1e-6), 'dds not close: %g', norm(dds_tree-dds_whole, 'inf'));
+
+% compare PGs from full W and W with nans removed
+for k = ac.Gens'
+    PG1 = trace(ac.Y_P(k) * Xstar_whole(select{1, :}));
+    PG2 = trace(ac.Y_P(k) * Xstar_tree(select{1, :}));
+    [flag, distance] = all_close(PG1, PG2, 1e-6);
+    verify(flag, 'PG%i not close: %g', k, distance)
+end

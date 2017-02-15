@@ -13,11 +13,11 @@ function [close, infnorm] = all_close(A, B, tol)
     end
 
     assert(all(size(A) == size(B)), 'Should be of same dimensions');
-
+    close = 1;
+    
     % loop over cell with doubles
     if isa(A, 'cell') && isa(B, 'cell')
 
-        close = 1;
         infnorm = -inf;
         for i = 1:length(A)
             A_tmp = A{i};
@@ -37,7 +37,9 @@ function [close, infnorm] = all_close(A, B, tol)
         infnorm = max(infnorm_tmp, infnorm);
     else
         % vectorize and check difference
-        close = all(abs(A(:) - B(:)) < tol);
+        if any(abs(A(:) - B(:)) >= tol)
+            close = 0;
+        end
         infnorm = norm(A(:) - B(:), 'inf');
     end
     

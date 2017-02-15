@@ -11,7 +11,6 @@ function Obj = objective(W_f, R_us, R_ds)
     wind = evalin('caller', 'wind');
     t = evalin('caller', 't');
     
-
     for j = 1:ac.N_G
             k = ac.Gens(j);
             P_Gk = trace(ac.Y_k(k)*W_f) + ac.P_D(t,k)-ac.C_w(k)*wind.P_wf(t);

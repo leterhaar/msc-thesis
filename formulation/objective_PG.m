@@ -1,12 +1,17 @@
-function Obj = objective_PG(W_f)
+function Obj = objective_PG(W_f, ac, wind)
 % Obj = objective_PG(W_f)
 %
 % Evaluates the deterministic part of the objective function
 % gets ac model and wind and t from the caller
 
     check_class({W_f}, {'sdpvar|double'});
-    ac = evalin('caller', 'ac');
-    wind = evalin('caller', 'wind');
+    if nargin < 2
+        ac = evalin('caller', 'ac');
+    end
+    if nargin < 3
+        wind = evalin('caller', 'wind');
+    end
+    
     t = evalin('caller', 't');
     Obj = 0;
     for j = 1:ac.N_G

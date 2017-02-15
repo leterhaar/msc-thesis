@@ -7,10 +7,10 @@ if not(exist('svd_rank', 'file'))
     addpath('../misc', '../networks', '../wind');
 end
 load('data/14bus.mat')
-
-slack = 1e-4;
-u_ = u_ + slack;
-l_ = l_ - slack;
+% 
+% slack = 1e-4;
+% u_ = u_ + slack;
+% l_ = l_ - slack;
 
 
 % get dimensions from data
@@ -23,7 +23,7 @@ it = struct();
 
 % initiate variables
 % Block 1
-X_init = zeros(d);
+X_init = ones(d);
 it.X = X_init;
 it.z_ = zeros(1,p);
 it.z_0 = 0;
@@ -46,7 +46,6 @@ it.Lambda_N_0 = zeros(d);
 it.Lambda_C_ = cell(q,1);
 [it.Lambda_C_{:}] = deal(zeros(d));
 
-
 it.pres = nan;
 it.energy = nan;
 it.obj = nan;
@@ -54,10 +53,10 @@ it.obj2 = nan;
 k = 1;
 
 %% start iterations
-max_its = 100000;
+max_its = 5000;
 prog = progress('Running ADMM', max_its-1);
 while k < max_its
-    mu = 1000;
+    mu = 100;
     it(k+1).energy = 0;
     it(k+1).pres = 0; % primal residue
     
@@ -91,7 +90,7 @@ while k < max_its
     
     % update X_C_r
     for r = 1:q
-        X_indef = it(k+1).X .* C_{r} + (it(k).Lambda_C_{r}/mu);
+        X_indef = (it(k+1).X .* C_{r}) + (it(k).Lambda_C_{r}/mu);
         it(k+1).X_C_{r} = project_PSD(X_indef, C_{r});
 %         it(k+1).energy = it(k+1).energy + mu*norm(it(k+1).X_C_{r} - it(k).X_C_{r}, 'fro')^2;
 %         it(k+1).pres = it(k+1).pres + norm(it(k+1).X .* C_{r} - it(k+1).X_C_{r}, 'fro')^2;
@@ -99,9 +98,9 @@ while k < max_its
     
     % update y_0 and X_N_0
     it(k+1).y_0 = (it(k+1).z_0 + (it(k).lambda_z_0/mu) ...
-                    - trace(M_0' * (N_0 .* it(k+1).X + ...
+                    - trace(M_0' * ((N_0 .* it(k+1).X) + ...
                     (it(k).Lambda_N_0/mu))))/(1+norm(M_0, 'fro')^2);
-    it(k+1).X_N_0 = N_0 .* it(k+1).X + (it(k).Lambda_N_0/mu) + ...
+    it(k+1).X_N_0 = (N_0 .* it(k+1).X) + (it(k).Lambda_N_0/mu) + ...
                                                         (it(k+1).y_0 * M_0);
     it(k+1).energy = it(k+1).energy + mu*norm(it(k+1).X_N_0 - it(k).X_N_0, 'fro')^2;
     it(k+1).pres = it(k+1).pres + norm(it(k+1).X .* N_0 - it(k+1).X_N_0, 'fro')^2;
@@ -110,9 +109,9 @@ while k < max_its
     % update y_s and X_N_s
     for s = 1:p
         it(k+1).y_(s) = (it(k+1).z_(s) + (it(k).lambda_z_(s)/mu) ...
-                        - trace(M_{s}' * (N_{s} .* it(k+1).X + ...
+                        - trace(M_{s}' * ((N_{s} .* it(k+1).X) + ...
                         (it(k).Lambda_N_{s}/mu))))/(1+norm(M_{s}, 'fro')^2);
-        it(k+1).X_N_{s} = N_{s} .* it(k+1).X + (it(k).Lambda_N_{s}/mu) + ...
+        it(k+1).X_N_{s} = (N_{s} .* it(k+1).X) + (it(k).Lambda_N_{s}/mu) + ...
                                                      (it(k+1).y_(s) * M_{s});
 %         it(k+1).energy = it(k+1).energy + mu*norm(it(k+1).X_N_{s} - it(k).X_N_{s}, 'fro')^2;
 %         it(k+1).pres = it(k+1).pres + norm(it(k+1).X .* N_{s} - it(k+1).X_N_{s}, 'fro')^2;

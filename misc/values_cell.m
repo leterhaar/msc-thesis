@@ -5,8 +5,10 @@ function xstar = values_cell(x)
 %
 % useful for cells of sdpvars
 
-n = length(x);
-xstar = cell(n,1);
+[n,m] = size(x);
+xstar = cell(n,m);
 for i = 1:n
-    xstar{i} = value(x{i});
+    for j = 1:m
+        xstar{i,j} = value(x{i,j});
+    end
 end

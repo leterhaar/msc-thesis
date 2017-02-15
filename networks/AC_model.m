@@ -19,6 +19,7 @@ classdef AC_model < handle
         S_max;           % Line flow limits
         P_lmmax;         % Real line flow limits
         Y;               % Complex nodal admittance matrix (N_b x N_b)
+        y_sh;            % shunt admittances per line
         P_D;             % Real power demanded [MW]
         Q_D;             % Reactive power demanded [MVAr]
         Ystar;           % Complex conjugate of Y
@@ -31,6 +32,7 @@ classdef AC_model < handle
         c_us;            % upspinning cost vector [$/MWh]
         c_ds;            % downspinning cost vector [$/MWh]
         refbus;          % id of the reference bus
+        bags;            % bags of buses from tree decomposition
     end
    
     methods
@@ -39,7 +41,7 @@ classdef AC_model < handle
             
             if nargin < 1
                 % load case14 by default
-                obj.model_name = 'case14';
+                obj.model_name = 'case30';
             else
                 obj.model_name = model_name;
             end
@@ -65,6 +67,7 @@ classdef AC_model < handle
             %% loads the model and creates all the system matrices
             % Based on [Zimmerman2015] chapter 3
             mpc = loadcase(obj.model_name);
+            baseMVA = mpc.baseMVA;
                         
             % determine number of branches, buses, generators and wind
             obj.N_l = size(mpc.branch, 1);
@@ -81,60 +84,21 @@ classdef AC_model < handle
             obj.Gens = mpc.gen(:, 1);
             obj.refbus = find(mpc.bus(:, 2) == 3);
             
-            for x = []
-            % preallocate space for admittance vectors and switching matrices
-            C_t = zeros(obj.N_l, obj.N_b);
-            C_f = zeros(obj.N_l, obj.N_b);
-            Y_ff = zeros(obj.N_l, 1);
-            Y_tf = zeros(obj.N_l, 1);
-            Y_ft = zeros(obj.N_l, 1);
-            Y_tt = zeros(obj.N_l, 1);
-            
-            % loop through branches
-            for i = 1:obj.N_l
+            % create Y
 
-                % extract branch data
-                branch = mpc.branch(i, :);
-                from = branch(1);                % from bus number
-                to = branch(2);                  % to bus number
-                r_s = branch(3);                 % series resistance [p.u.]
-                x_s = branch(4);                 % series reactance [p.u.]
-                b_c = branch(5);                 % series susceptance [p.u.]
-                tau = branch(9);                 % turns ratio [x]
-                theta = branch(10);              % phase shift [degrees]
-                
-                % NB discuss this with Vahab
-                if tau == 0
-                    tau = 1;
-                end
-
-                % construct from and to switching matrices
-                from_i = find(mpc.bus(:,1) == from);
-                to_i = find(mpc.bus(:,1) == to);
-                C_t(i, from_i) = 1;
-                C_f(i, to_i) = 1;
-                
-                % construct admittance vectors
-                j = sqrt(-1);                    % imaginary unit
-                y_s = 1/(r_s + (j * x_s));         % series admittance
-                Y_ff(i) = (y_s + j * b_c / 2 ) * ( 1 / ( tau^2) );
-                Y_ft(i) = -y_s * (1/(tau * exp(-j * theta)));
-                Y_tf(i) = -y_s * (1/(tau * exp(j * theta)));
-                Y_tt(i) = y_s + j * b_c / 2;
-                
-            end
+            obj.Y = full(makeYbus(mpc));
+            obj.Ystar = obj.Y';
             
-            % make shunt admittance vector
-            G_sh = mpc.bus(:, 5);                   % shunt conductance
-            B_sh = mpc.bus(:, 6);                   % shunt susceptance 
-            Y_sh = G_sh + j * B_sh;                 % shunt admittance
+            % make shunt admittance for lines
+            G_sh = mpc.bus(:, 5);                % shunt conductance
+            B_sh = mpc.bus(:, 6);                % shunt susceptance 
+            y_shunt_bus = G_sh + sqrt(-1) * B_sh;% shunt admittance per bus
+%             y_shunt_bus = y_shunt_bus ./ baseMVA;
+            b_line = mpc.branch(:, 5) * sqrt(-1);           % charging susceptance
+            obj.y_sh = nan(obj.N_l, 1);
             
-            % create nodal admittance matrix
-            Y_f = diag(Y_ff) * C_f + diag(Y_ft) * C_t;
-            Y_t = diag(Y_tf) * C_f + diag(Y_tt) * C_t;
-            obj.Y = C_f' * Y_f + C_t' * Y_t + diag(Y_sh);
-            obj.Ystar = conj(obj.Y);
-            
+            for l = 1:obj.N_l
+                obj.y_sh(l) = y_shunt_bus(obj.from_to(l, 2)) + b_line(l);
             end
             
             % create switching matrix for generators C_g
@@ -152,8 +116,6 @@ classdef AC_model < handle
             Q_Gmin = mpc.gen(:, 5);          % React lower limit [MVAr]
             
             % convert to maximum bus injection
-            baseMVA = mpc.baseMVA;
-            % baseMVA = 1;
             obj.P_max = obj.C_G * P_Gmax / baseMVA;
             obj.P_min = obj.C_G * P_Gmin / baseMVA;
             obj.Q_max = obj.C_G * Q_Gmax / baseMVA;
@@ -164,12 +126,9 @@ classdef AC_model < handle
             obj.Q_D = mpc.bus(:, 4) / baseMVA;
             
             % distribute along profile
-            load('load_profile.mat');
+            load('../networks/load_profile.mat');
             obj.P_D = LoadProf * obj.P_D';
             obj.Q_D = LoadProf * obj.Q_D';
-            
-            obj.Y = makeYbus(mpc);
-            obj.Ystar = obj.Y';
             
             % add generator costs if of the right format (quadratic)
             if isfield(mpc, 'gencost')
@@ -270,12 +229,40 @@ classdef AC_model < handle
             m = obj.from_to(k, 2);
             e_l = obj.e(l);
             e_m = obj.e(m);
-            shunt = 0; % not available through MATPOWER
+            shunt = obj.y_sh(k);
             
             y_lm = -obj.Y(l,m);
             Y_lm = (shunt + y_lm) * e_l * e_l' - (y_lm) * e_l * e_m';
             Ylm = 0.5 * [real(Y_lm + Y_lm.') imag(Y_lm.' - Y_lm)
                          imag(Y_lm - Y_lm.') real(Y_lm + Y_lm.')];
+        end
+        
+        function Ylm = Y_lm_complex(obj, k)
+            %% returns Y_lm from the k-th branch (from Madani 2015)
+            
+            l = obj.from_to(k, 1);
+            m = obj.from_to(k, 2);
+            e_l = obj.e(l);
+            e_m = obj.e(m);
+            shunt = obj.y_sh(k);
+            
+            y_lm = -obj.Y(l,m);
+            Ylm = (shunt + y_lm) * e_l * e_l' - (y_lm) * e_l * e_m';
+            Ylm = 0.5 * (Ylm' + Ylm);
+        end
+        
+        function Ylm = Ybar_lm_complex(obj, k)
+            %% returns Y_lm from the k-th branch (from Madani 2015)
+            
+            l = obj.from_to(k, 1);
+            m = obj.from_to(k, 2);
+            e_l = obj.e(l);
+            e_m = obj.e(m);
+            shunt = obj.y_sh(k);
+            
+            y_lm = -obj.Y(l,m);
+            Ylm = (shunt + y_lm) * e_l * e_l' - (y_lm) * e_l * e_m';
+            Ylm = 0.5*sqrt(-1) * (-Ylm' + Ylm);
         end
         
         function Ybarlm = Ybar_lm(obj, k)
@@ -285,7 +272,7 @@ classdef AC_model < handle
             m = obj.from_to(k, 2);
             e_l = obj.e(l);
             e_m = obj.e(m);
-            shunt = 0; % not available through MATPOWER
+            shunt = obj.y_sh(k);
             
             y_lm = -obj.Y(l,m);
             Y_lm = (shunt + y_lm) * e_l * e_l' - (y_lm) * e_l * e_m';
@@ -293,7 +280,7 @@ classdef AC_model < handle
                              real(Y_lm.' - Y_lm) imag(Y_lm + Y_lm.')];
         end
         
-        function Mk = M_k(obj, k, flag)
+        function Mk = M_k(obj, k, varargin)
             %% returns M_k from Lavei 2012
             assert(k <= obj.N_b, 'k cannot be larger than number of buses');
             e_k = obj.e(k);
@@ -336,6 +323,23 @@ classdef AC_model < handle
             refbus_im = obj.N_b + obj.refbus;
             Ek(refbus_im, refbus_im) = 1;
         end
+        
+        
+        function M = lineflows(obj, l, W)
+            %% lineflows(l, W)
+            % Returns the matrix 3x3 matrix M <= 0 to enforce line flow 
+            % constraints
+            if obj.S_max(l) ~= 0
+                M = [-(obj.S_max(l)^2) trace(obj.Y_lm(l)*W) trace(obj.Ybar_lm(l)*W); ...
+                     trace(obj.Y_lm(l)*W) -1 0; ...
+                     trace(obj.Ybar_lm(l)*W) 0 -1];
+            else
+                M = zeros(3);
+            end
+            
+            
+        end
+            
         
         % draws the network layout
         function draw_network(obj)
@@ -394,6 +398,38 @@ classdef AC_model < handle
             % shortcut for Y_k(k)
             res = obj.Y_k(k);
         end
+        
+        function res = Ybar_(obj, k)
+            % shortcut for Ybar_k(k)
+            res = obj.Ybar_k(k);
+        end
+        
+        function [bags, tw] = get_bags(obj, alpha)
+            if isempty(obj.bags)
+                if nargin < 2
+                    alpha = 0;
+                end
+                
+                % add +N_b to all lines to go to rectangular voltage
+                % notation
+                shifts_from = repelem([0 obj.N_b 0 obj.N_b]', obj.N_l);
+                shifts_to =   repelem([0 0 obj.N_b obj.N_b]', obj.N_l);
+                from = repmat(obj.from_to(:,1), 4, 1) + shifts_from;
+                to = repmat(obj.from_to(:,2), 4, 1) + shifts_to;
+                status = ones(4*obj.N_l, 1);
+                
+                buses = 1:2*obj.N_b;
+
+                % Uses the code from Madanis SDP OPF solver
+                [tw, ~, bags] = Permutation(buses,from,to,status,alpha);  
+                obj.bags = bags;
+            else
+                bags = obj.bags;
+                tw = max(cellfun(@(x) length(x), bags))-1;
+            end
+        end
+        
+            
     end
 end
 

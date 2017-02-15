@@ -63,8 +63,6 @@ function PGvsPW(type, varargin)
         error('Unknown type: %s', type);
     end
     
-    % something is wrong here.... 
-    
     % plot
     initfig('P^G + R vs P^m', str2double(type(end)));
     plot(repmat(Pms', 1, ac.N_G), PGs);

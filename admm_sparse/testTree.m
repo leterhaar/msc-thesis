@@ -13,11 +13,11 @@ end
 
 %% load models
 N_t = 24;   % optimization horizon
-N = 2;      % number of scenarios used for optimization
+N = 10;      % number of scenarios used for optimization
 t = 1; % timestep used for this demonstration (todo: add for everything)
 
 % load network and wind models
-ac = AC_model('case14a');
+ac = AC_model('case14');
 wind = wind_model(ac, N_t, 0.2);
 
 % generate a number of scenarios
@@ -28,7 +28,7 @@ wind.P_w = [wind.P_wf, wind.P_w];
 wind.P_m = [zeros(N_t, 1), wind.P_m];
 
 % optimization settings
-ops = sdpsettings('solver', 'mosek');
+ops = sdpsettings('solver', 'sedumi');
 %% define optimization variables and formulate objective
 
 % define X \in H^{n*(N+1)}
@@ -168,7 +168,7 @@ for i = 1:N+1
     verify(not(any(isnan(Xstar_tree(select{i,:})))), 'nans in tree submatrix for s%2i', i);
 end
         
-Xstar_tree(isnan(Xstar_tree)) = 0;
+% Xstar_tree(isnan(Xstar_tree)) = 0;
 Rus_tree = value(R_us);
 Rds_tree = value(R_ds);
 dus_tree = value(d_us);

@@ -22,11 +22,13 @@ function Xres = project_PSD(X, sparsity)
     try
         % do an eigenvalue decomposition
         [Q, D] = eig(X_small);
-        D = max(real(D), 0);          % remove negative eigenvalues
+        % remove negative eigenvalues
+        D = max(real(D), 0);          
+        % reconstruct X_small
         X_small = Q * D / Q;
     catch e
+        e.getReport()
         keyboard
-        
     end
     Xres = selector * X_small * selector';
 end

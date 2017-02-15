@@ -139,7 +139,7 @@ classdef wind_model < handle
                 
             end
             
-            xlim([1 24]);
+            xlim([1 max(1.1, obj.N_t)]);
             xlabel('Time [h]');
             ylabel('Wind power [p.u.]');
             title('Wind power forecast and scenarios');
@@ -206,6 +206,31 @@ classdef wind_model < handle
                         'P_w', obj.P_w(:, i_start:i_end), ...
                         'P_m', obj.P_m(:, i_start:i_end));
         end
+        
+        function shorter_horizon(obj, N_t)
+        %% shorten the horizon to N_t steps
+        
+            obj.P_m = obj.P_m(1:N_t, :);
+            obj.P_w = obj.P_w(1:N_t, :);
+            obj.P_wf = obj.P_wf(1:N_t);
+            
+            obj.N_t = N_t;
+        end
+        
+        function save(obj, name)
+        %% saves the instance of the wind model
+            save(['/Users/leterhaar/Dropbox/TU/Afstuderen/Ole/code/wind/' name], 'obj');
+        end
+        
+        function load(obj, name)
+            saved_model = load(['/Users/leterhaar/Dropbox/TU/Afstuderen/Ole/code/wind/' name]);
+            
+            % loop over properties and assign
+            for propname = fieldnames(saved_model.obj)'
+                obj.(propname{1}) = saved_model.obj.(propname{1});
+            end
+        end
+        
     end
  
 end
