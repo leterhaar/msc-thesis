@@ -5,34 +5,33 @@ clear
 clc
 yalmip('clear');
 clf
-
+ops = sdpsettings;
 % ops = sdpsettings('solver', 'mosek', 'verbose', 1, 'debug', 1);
 % ops = sdpsettings('solver', 'sedumi', 'verbose', 1, 'debug', 1);
 %% load models
-N_t = 24;
-N = 1000;
+T = 2;
+N = 3;
 tol = 1e-5;
 ac = AC_model('case30'); 
-ac.make_model();
 ac.set_WPG_bus(22);
 
 wind = wind_model(ac, 24, 0.2);
 wind.generate(N);
-wind.shorter_horizon(N_t);
+wind.shorter_horizon(T);
 wind.plot;
 
 % P1
 fprintf('RUNNING P1\n');
 
 % define variables
-W_f = cell(N_t, 1);
-W_s = cell(N_t, N);
-R_us = cell(N_t, 1);
-R_ds = cell(N_t, 1);
-d_us = cell(N_t, 1);
-d_ds = cell(N_t, 1);
+W_f = cell(T, 1);
+W_s = cell(T, N);
+R_us = cell(T, 1);
+R_ds = cell(T, 1);
+d_us = cell(T, 1);
+d_ds = cell(T, 1);
 
-for t = 1:N_t
+for t = 1:T
     W_f{t} = sdpvar(2*ac.N_b);
     R_us{t} = sdpvar(ac.N_G, 1);
     R_ds{t} = sdpvar(ac.N_G, 1);
@@ -47,7 +46,7 @@ Obj = 0;
 C = [];
 
 % loop over time
-for t = 1:N_t
+for t = 1:T
     % define objective
     Obj = Obj + objective(W_f{t}, R_us{t}, R_ds{t});
     
@@ -85,7 +84,7 @@ verify(not(status.problem), status.info);
 cost = value(Obj);
 
 % extract solution per hour
-for t = 1:N_t
+for t = 1:T
     R_opt = nan(ac.N_G, N);
     PG_opt = nan(ac.N_G, 1);
     W_fopt = zero_for_nan(value(W_f{t}));
@@ -107,19 +106,33 @@ for t = 1:N_t
     d_dsopt = value(d_ds{t});
 
 
-    format_result(ac, wind, t, {W_fopt, W_sscen, R_usopt, R_dsopt, d_usopt, d_dsopt}, R_opt);
-
-    PGvsPW('P1', W_sscen, W_fopt);
-
-    
+    format_result(ac, wind, t, {W_fopt, W_sscen, R_usopt, R_dsopt, d_usopt, d_dsopt}, R_opt);   
 end
+%%
+wind_MC = wind_model(ac, 24, 0.2);
+wind_MC.generate(1e4);
+wind_MC.shorter_horizon(T);
+[violations, loadings] = simulate(ac, values_cell(W_f), values_cell(d_us), values_cell(d_ds), wind_MC);
 
-simulate_network(ac, wind, values_cell(W_f), values_cell(d_us), values_cell(d_ds), [], 1, tol);
+%% plot
+initfig('Violations', 1);
+hold off
+bar3(violations');
+xlabel('Line number');
+zlabel('Violation');
+ylabel('Hour');
 
-solutions(1) = struct('Name', 'P1', ...
-                   'Cost', cost, ...
-                   'solvertime', status.solvertime, ...
-                   'solverinfo', status.info);
+
+initfig('Loadings', 2);
+boxplot(loadings');
+hold on;
+xlims = xlim;
+plot([-1 ac.N_l+1], [100 100], '--');
+xlim(xlims);
+xlabel('Line number');
+ylabel('Loading [%]');
+
+% simulate_network(ac, wind, values_cell(W_f), values_cell(d_us), values_cell(d_ds), [], 1, tol);
 
 %% P3 different objective
 yalmip('clear');
@@ -127,11 +140,11 @@ fprintf('\nRUNNING P3\n');
 
 
 % define SDPvars
-W_0 = cell(N_t, 1);
-W_us = cell(N_t, 1);
-W_ds = cell(N_t, 1);
+W_0 = cell(T, 1);
+W_us = cell(T, 1);
+W_ds = cell(T, 1);
 
-for t = 1:N_t
+for t = 1:T
     W_0{t} = sdpvar(2*ac.N_b);
     W_us{t} = sdpvar(2*ac.N_b);
     W_ds{t} = sdpvar(2*ac.N_b);
@@ -151,9 +164,9 @@ end
 
 Obj = 0;
 C = [];
-W_f = cell(N_t, 1);
-W_s = cell(N_t, N);
-for t = 1:N_t
+W_f = cell(T, 1);
+W_s = cell(T, N);
+for t = 1:T
     % define objective
     W_f{t} = W_0{t} + wind.P_wf(t)*W_us{t};
     Obj = Obj + objective(W_f{t}, R_us{t}, R_ds{t}); 
@@ -202,11 +215,11 @@ status = optimize(C, Obj, ops);
 verify(not(status.problem), status.info);
 cost = value(Obj);
 
-W_fopt = cell(N_t, 1);
-d_usopt = cell(N_t, 1);
-d_dsopt = cell(N_t, 1);
+W_fopt = cell(T, 1);
+d_usopt = cell(T, 1);
+d_dsopt = cell(T, 1);
 
-for t = 1:N_t
+for t = 1:T
     % extract solution
     R_opt = nan(ac.N_G, N);
     PG_opt = nan(ac.N_G, 1);
@@ -238,7 +251,7 @@ for t = 1:N_t
     PGvsPW('P3', value(W_0{t}), value(W_us{t}), value(W_ds{t}));
 end
     
-simulate_network(ac, wind, W_fopt, d_usopt, d_dsopt, [], 1, tol);
+% simulate_network(ac, wind, W_fopt, d_usopt, d_dsopt, [], 1, tol);
 % verify(not(problem), info);
 solutions(2) = struct('Name', 'P3 new cost function',...
                    'Cost', cost,...

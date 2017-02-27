@@ -1,4 +1,4 @@
-function [violations, amount] = simulate(ac, Wf, d_us, d_ds, wind, verbose)
+function [violations, loadings] = simulate(ac, Wf, d_us, d_ds, wind, verbose)
 % runs a MC simulation using MATPOWERs runpf
 % for one wind trajectory
 %
@@ -10,7 +10,11 @@ function [violations, amount] = simulate(ac, Wf, d_us, d_ds, wind, verbose)
 % d_ds : cell with T downspinning reserve distribution vectors
 % wind : wind model
 % verbose : flag to suppress progress, default true
-
+%
+% RETURNS
+% =======
+% violations: a TxN_l matrix with the number of violations
+% loadings: a N_l x (T x (N_s+1)) matrix with line loadings (percentage)
     if nargin < 6
         verbose = 1;
     end
@@ -20,7 +24,7 @@ function [violations, amount] = simulate(ac, Wf, d_us, d_ds, wind, verbose)
     [T, N_s] = size(wind.P_w);
 
     violations = nan(ac.N_l, T);
-    amount = nan(ac.N_l, T, N_s+1);
+    loadings = nan(ac.N_l, T, N_s+1);
     opts = mpoption('verbose', 0, 'out.all', 0);
     
     if verbose
@@ -64,7 +68,7 @@ function [violations, amount] = simulate(ac, Wf, d_us, d_ds, wind, verbose)
         
         % check 
         violations(:, t) = S_f > (ac.S_max*mpc.baseMVA);
-        amount(:, t, 1) = S_f / ac.S_max*mpc.baseMVA * 100;
+        loadings(:, t, 1) = S_f ./ (ac.S_max*mpc.baseMVA) * 100;
         
         if verbose
             prog.ping();
@@ -98,12 +102,12 @@ function [violations, amount] = simulate(ac, Wf, d_us, d_ds, wind, verbose)
 
             % check 
             violations(:, t) = violations(:,t) + (S_f > (ac.S_max*mpc.baseMVA));
-            amount(:, t, i+1) = S_f / ac.S_max*mpc.baseMVA * 100;
+            loadings(:, t, i+1) = S_f ./ (ac.S_max*mpc.baseMVA) * 100;
             
             if verbose
                 prog.ping();
             end
         end
     end
-    
+    loadings = reshape(loadings, ac.N_l, (T*(N_s+1)));
 end
