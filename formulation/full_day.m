@@ -117,10 +117,16 @@ wind_MC.shorter_horizon(T);
 %% plot
 initfig('Violations', 1);
 hold off
-bar3(violations');
-xlabel('Line number');
-zlabel('Violation');
-ylabel('Hour');
+b = bar3(violations/1e2);
+for k = 1:length(b)
+    zdata = b(k).ZData;
+    b(k).CData = zdata;
+    b(k).FaceColor = 'interp';
+end
+ylabel('Line number');
+zlabel('Violated [%]');
+xlabel('Hour');
+% ylim([0.5 ac.N_l+0.5]);
 
 
 initfig('Loadings', 2);
