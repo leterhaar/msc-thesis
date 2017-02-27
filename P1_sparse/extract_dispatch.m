@@ -1,5 +1,5 @@
-function [P_G, Q_G] = extract_dispatch(W, t)
-% [Vopt, PGopt, QGopt, Wopt] = extract_dispatch(W, t)
+function [P_G, Q_G, Vmag] = extract_dispatch(W, t)
+% [PGopt, QGopt, Vopt] = extract_dispatch(W, t)
 % uses 'wind' and 'ac' from caller to  extract generator dispatch from W at
 % time t
 
@@ -16,5 +16,8 @@ function [P_G, Q_G] = extract_dispatch(W, t)
         P_G(j) = trace(ac.Y_(k)*W) - ac.C_w(k)*wind.P_wf(t) + ac.P_D(t, k);
         Q_G(j) = trace(ac.Y_(k)*W) + ac.Q_D(t, k);
     end
+    
+    diagonal = diag(W);
+    Vmag = sqrt(diagonal(1:ac.N_b) + diagonal(ac.N_b+1:end));
     
 end

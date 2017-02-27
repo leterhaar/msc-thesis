@@ -5,23 +5,23 @@ clear
 clc
 yalmip('clear');
 clf
-addpath('../wind', '../networks', '../misc');
 
-ops = sdpsettings('solver', 'mosek', 'verbose', 1, 'debug', 1);
+% ops = sdpsettings('solver', 'mosek', 'verbose', 1, 'debug', 1);
 % ops = sdpsettings('solver', 'sedumi', 'verbose', 1, 'debug', 1);
 %% load models
-N_t = 5;
-N = 10;
+N_t = 24;
+N = 1000;
 tol = 1e-5;
 ac = AC_model('case30'); 
-ac.set_WPG_bus(9);
+ac.make_model();
+ac.set_WPG_bus(22);
 
 wind = wind_model(ac, 24, 0.2);
 wind.generate(N);
 wind.shorter_horizon(N_t);
 wind.plot;
 
-%% P1
+% P1
 fprintf('RUNNING P1\n');
 
 % define variables
@@ -118,12 +118,6 @@ simulate_network(ac, wind, values_cell(W_f), values_cell(d_us), values_cell(d_ds
 
 solutions(1) = struct('Name', 'P1', ...
                    'Cost', cost, ...
-      ...             'PGCost', objective_PG(W_fopt), ...
-      ...             'RCost', a_posteriori_cost(PG_opt, R_opt) - objective_PG(W_fopt), ...
-      ...             'APCost', a_posteriori_cost(PG_opt, R_opt), ...
-      ...             'W_f', value(W_f), ...
-      ...             'R_us', value(R_us), ...
-      ...             'R_ds', value(R_ds), ...
                    'solvertime', status.solvertime, ...
                    'solverinfo', status.info);
 

@@ -20,16 +20,21 @@ classdef subnetwork < AC_model
             
             % find lines in subnetwork
             lines = [];
+            obj.from_to = [];
             for k = 1:ac.N_l
                 from = ac.from_to(k, 1);
                 to = ac.from_to(k, 2);
                 if ismember(from, all_buses) && ismember(to, all_buses)
+                    new_from = find(from == all_buses);
+                    new_to = find(to == all_buses);
+                    obj.from_to = [obj.from_to; new_from new_to];
                     lines = [lines; k];
                 end
             end
             
+            
             % find gens in subnetwork
-            obj.C_G = ac.C_G(all_buses, :);
+            obj.C_G = ac.C_G(own_buses, :);
             obj.Gens = find(sum(obj.C_G) > 0);
             obj.C_G = obj.C_G(:, obj.Gens);
             
@@ -47,7 +52,7 @@ classdef subnetwork < AC_model
                     obj.(key) = value(all_buses, all_buses);
                 
                 % line limits
-                elseif ismember(key, {'S_max', 'P_lmmax', 'y_sh', 'from_to'})
+                elseif ismember(key, {'S_max', 'P_lmmax', 'y_sh'})
                     obj.(key) = value(lines, :);
                 
                 % load profiles

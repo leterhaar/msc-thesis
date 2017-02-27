@@ -5,13 +5,13 @@ if not(exist('AC_model', 'file'))
     addpath('../misc', '../networks', '../wind');
 end
 
-N = 2;
+N = 20;
 t = 15;
 tol = 1e-4;
 
 
-ac = AC_model('case14');
-ac.set_WPG_bus(9);
+ac = AC_model('case_ieee30');
+ac.set_WPG_bus(22);
 % ac.c_ds = 1./ac.c_us;
 
 wind = wind_model(ac, 24, 0.2);

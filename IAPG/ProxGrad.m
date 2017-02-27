@@ -17,7 +17,7 @@
 %   - opt_settings  : optimization settings (default verbose = 0)
 %   - alpha         : function handle for alpha. default alpha = 1/(k+1)
 
-function [xstar, its] = PG(x_sdp, F, grad_F, constraints, varargin)
+function [xstar, its] = ProxGrad(x_sdp, F, grad_F, constraints, varargin)
 
     % check types of input
     assert(isa(x_sdp, 'sdpvar'), 'x should be sdpvar');

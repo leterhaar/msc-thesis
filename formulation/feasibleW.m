@@ -42,32 +42,34 @@ function C = feasibleW(W_s, P_w, ac, notation)
             if not(isnan(ac.P_min(k)))
                 
                 % P_inj (1)
-                C = [C, ac.P_min(k) ...
+                C = [C, (ac.P_min(k) ...
                     <= trace(ac.Y_k(k)*W_s) + ac.P_D(t, k) - ac.C_w(k)*P_w(t) <= ...
-                       ac.P_max(k)];
+                       ac.P_max(k)):sprintf('P_inj b%i t%i', k, t)];
 
                 % Q_inj (2)
-                C = [C, ac.Q_min(k) ...
+                C = [C, (ac.Q_min(k) ...
                     <= trace(ac.Ybar_k(k)*W_s) + ac.Q_D(t, k) <=...
-                       ac.Q_max(k)];
-
-                % V_bus (3)
-                C = [C, ac.V_min(k)^2 ...
-                    <= trace(ac.M_k(k)*W_s) <= ...
-                       ac.V_max(k)^2];
+                       ac.Q_max(k)):sprintf('Q_inj b%i t%i', k, t)];
             end
+            % V_bus (3)
+            C = [C, (ac.V_min(k)^2 ...
+                <= trace(ac.M_k(k)*W_s) <= ...
+                   ac.V_max(k)^2):sprintf('V_bus b%i t%i', k, t)];
+            
 
         end
 
         for l = 1:ac.N_l
             % apparent line flow constraints
-            C = [C, ac.lineflows(l, W_s) <= 0];
+            if isa(ac.lineflows(l, W_s), 'constraint')
+                C = [C, (ac.lineflows(l, W_s) <= 0):sprintf('lineflows l%i t%i', l, t)];
+            end
         end
 
         % refbus constraints
         if not(isempty(ac.refbus))
             refbus = ac.refbus + ac.N_b;    
-            C = [C, W_s(refbus, refbus) == 0];
+            C = [C, (W_s(refbus, refbus) == 0):sprintf('refbus t%i', t)];
         end
     else
         % define constraints for every bus

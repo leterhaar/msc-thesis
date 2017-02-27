@@ -6,7 +6,7 @@ clc
 if not(exist('svd_rank', 'file'))
     addpath('../misc', '../networks', '../wind');
 end
-load('data/14bus.mat')
+load('data/sdp_lib.mat')
 % 
 % slack = 1e-4;
 % u_ = u_ + slack;
@@ -23,7 +23,7 @@ it = struct();
 
 % initiate variables
 % Block 1
-X_init = ones(d);
+X_init = -ones(d);
 it.X = X_init;
 it.z_ = zeros(1,p);
 it.z_0 = 0;
@@ -53,10 +53,10 @@ it.obj2 = nan;
 k = 1;
 
 %% start iterations
-max_its = 5000;
+max_its = 500;
 prog = progress('Running ADMM', max_its-1);
 while k < max_its
-    mu = 100;
+    mu = 1000;
     it(k+1).energy = 0;
     it(k+1).pres = 0; % primal residue
     

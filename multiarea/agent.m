@@ -3,7 +3,7 @@ classdef agent < handle
     properties
        % problem data
        ac; wind;
-       buses; mu;
+       buses; mu; own_buses;
        
        % selection of entries from neighouring submatrices
        s_n; 
@@ -28,7 +28,7 @@ classdef agent < handle
             obj.ac = subnetwork(ac, all_buses, own_buses);
             obj.wind = wind;
             obj.buses = all_buses;
-%             obj.own_buses = own_buses;
+            obj.own_buses = own_buses;
             obj.mu = mu;
             obj.W = zeros(2*obj.ac.N_b);
             obj.W(1:obj.ac.N_b, 1:obj.ac.N_b) = ones(obj.ac.N_b);
@@ -62,7 +62,7 @@ classdef agent < handle
            
             % optimize
             status = optimize(Constraints, Objective, sdpsettings('verbose', 0));
-            verify(not(status.problem), status.info);
+%             verify(not(status.problem), status.info);
 
             % store solution
             obj.W = value(Wf);
