@@ -17,11 +17,11 @@ ac.set_WPG_bus(22);
 wind = wind_model(ac, 24, 0.2);
 while 1
     wind.generate(N);
-    wind.plot(t);
-    pause(0.01);
-    if min(wind.P_w(t,:)) == 0
-        break
-    end
+%     wind.plot(t);
+%     pause(0.01);
+%     if min(wind.P_w(t,:)) == 0
+    break
+%     end
 end
 % wind.use_extremes(t);
 % N = 2;
@@ -31,7 +31,7 @@ ops = sdpsettings('solver', 'mosek', 'verbose', 1, 'debug', 1);
 
 %% P1
 yalmip('clear');
-fprintf('\nRUNNING P1\n');
+fprintf('\nRUNNING C-OPF-RS \n');
 
 % define SDPvars
 R_us = sdpvar(ac.N_G, 1);
@@ -116,111 +116,11 @@ solutions(1) = struct('Name', 'P1',...
                    'R_ds', value(R_ds),...
                    'solvertime', status.solvertime,...
                    'solverinfo', status.info);
-               
-%% P1 different objective
-yalmip('clear');
-fprintf('\nRUNNING P1 different objective\n');
-
-% define SDPvars
-d_us = sdpvar(ac.N_G, 1);
-d_ds = sdpvar(ac.N_G, 1);
-W_f = sdpvar(2*ac.N_b);
-W_s = cell(N,1);
-
-Ysum = zeros_like(ac.Y_k(1));
-Ysum_us = zeros_like(Ysum);
-Ysum_ds = zeros_like(Ysum);
-for j = 1:ac.N_G
-    k = ac.Gens(j);
-    Ysum = Ysum + ac.Y_k(k);
-    Ysum_us = Ysum_us + ac.c_us(j) * ac.Y_k(k);
-    Ysum_ds = Ysum_ds + ac.c_ds(j) * ac.Y_k(k);
-end
-
-
-% define objective
-Obj = objective_PG(W_f);
-
-% define constraints
-C = feasibleW(W_f, wind.P_wf);
-C = [C, W_f >= 0];
-
-for i = 1:N
-    W_s{i} = sdpvar(2*ac.N_b);
-    C = [C, feasibleW(W_s{i}, wind.slice(i).P_w)];
-    C = [C, W_s{i} >= 0];
-    
-   
-    
-    for j = 1:ac.N_G
-        k = ac.Gens(j);
-        
-        % relate W_s and W_f through d_ds and d_us
-        C = [C, trace(ac.Y_k(k)*(W_s{i}-W_f)) - ac.C_w(k)*wind.P_m(t, i) == ...
-            d_us(j) * max(0, -wind.P_m(t, i)) - d_ds(j) * max(0, wind.P_m(t, i))];
-        
-        % add to objective
-        Obj = Obj + (2/N)*(ac.c_us(j) * d_us(j) * max(0, -wind.P_m(t, i)) + ... 
-              ac.c_ds(j) * d_ds(j) * max(0, wind.P_m(t, i)));
-    end
-
-end
-
-% reserve balancing constraints
-C = [C, ones(1, ac.N_G)*d_us == 1, ones(1, ac.N_G)*d_ds == 1];
-C = [C, d_us >= 0, d_ds >= 0];
-
-% optimize
-status = optimize(C, Obj, ops);
-verify(not(status.problem), status.info);
-cost = value(Obj);
-
-R_opt = nan(ac.N_G, N);
-PG_opt = nan(ac.N_G, 1);
-W_fopt = zero_for_nan(value(W_f));
-W_sscen = nan(2*ac.N_b, 2*ac.N_b, N);
-for i = 1:N
-    W_sscen(:,:,i) = value(W_s{i});
-          
-    for j = 1:ac.N_G
-        k = ac.Gens(j);
-        R_opt(j,i) = trace(ac.Y_k(k)*(W_sscen(:,:,i)-W_fopt)) - ac.C_w(k)*wind.P_m(t, i);
-        if i == 1
-            PG_opt(j) = trace(ac.Y_k(k)*W_fopt) - ac.C_w(k)*wind.P_w(t, i) + ac.P_D(t, k);
-        end
-    end
-end
-R_usopt = zeros(ac.N_G, 1);
-R_dsopt = zeros(ac.N_G, 1);
-d_usopt = value(d_us);
-d_dsopt = value(d_ds);
-
-
-format_result(ac, wind, t, {W_fopt, W_sscen, R_usopt, R_dsopt, d_usopt, d_dsopt}, R_opt);
-
-PGvsPW('P1', W_sscen, W_fopt);
-
-[problem, info] = simulate_network(ac, wind, value(W_f), ...
-                                              value(d_us), value(d_ds), t, 1, tol);
-% verify(not(problem), info);
-
-solutions(2) = struct('Name', 'P1 new cost function',...
-                   'Cost', cost,...
-                   'PGCost', objective_PG(W_fopt),...
-                   'RCost', a_posteriori_cost(PG_opt, R_opt) - objective_PG(W_fopt),...
-                   'APCost', a_posteriori_cost(PG_opt, R_opt),...
-                   'W_f', value(W_f),...
-                   'R_us', [],...
-                   'R_ds', [],...
-                   'solvertime', status.solvertime,...
-                   'solverinfo', status.info);
-               
-
-%% P2
+%% PC-OPF-RS
 
 clear Obj C
 yalmip('clear');
-fprintf('\nRUNNING P2\n');
+fprintf('\nRUNNING PC-OPF-RS \n');
 
 
 % define SDPvars
@@ -235,14 +135,13 @@ Obj = objective(W_f, R_us, R_ds);
 
 % define constraints
 C = feasibleW(W_f, wind.P_wf);
-C = [C, W_f >= 0];
+C = [C, W_f >= 0, W_us >= 0, W_ds >= 0];
 
 for i = 1:N
-    W_s = W_f + W_us * max(0, wind.P_m(t, i)) ...
-              + W_ds * min(0, wind.P_m(t,i));
+    W_s = W_f + W_us * max(0, -wind.P_m(t, i)) ...
+              + W_ds * max(0, wind.P_m(t,i));
           
     C = [C, feasibleW(W_s, wind.slice(i).P_w)];
-    C = [C, W_s >= 0];
     
     for j = 1:ac.N_G
         k = ac.Gens(j);
@@ -258,15 +157,9 @@ end
 % Nonnegativity constraints on reserve bounds
 C = [C, R_us >= 0, R_ds >= 0];
 
-% reserve balancing constraints
-Ysum = zeros_like(ac.Y_k(1));
-for k = ac.Gens'
-    Ysum = Ysum + ac.Y_k(k);
-end
-
 % sum Wm = 1
-C = [C, (trace(Ysum * W_us) == -1)];   
-C = [C, (trace(Ysum * W_ds) == -1)];
+C = [C, (trace(ac.Y_sum * W_us) == 1)];   
+C = [C, (trace(ac.Y_sum * W_ds) == -1)];
 
 % optimize
 status = optimize(C, Obj, ops);
@@ -275,11 +168,11 @@ cost = value(Obj);
 
 R_opt = nan(ac.N_G, N);
 PG_opt = nan(ac.N_G, 1);
-W_fopt = zero_for_nan(value(W_f));
+W_fopt = value(W_f);
 W_sscen = nan(2*ac.N_b, 2*ac.N_b, N);
 for i = 1:N
-    W_sscen(:,:,i) =  W_fopt + value(W_us) * max(0, wind.P_m(t, i)) ...
-              + value(W_ds) * min(0, wind.P_m(t,i));
+    W_sscen(:,:,i) =  W_fopt + value(W_us) * max(0, -wind.P_m(t, i)) ...
+              + value(W_ds) * max(0, wind.P_m(t,i));
           
     for j = 1:ac.N_G
         k = ac.Gens(j);
@@ -292,10 +185,10 @@ end
 R_usopt = value(R_us);
 R_dsopt = value(R_ds);
 
-
+%%
 for j = 1:ac.N_G
     k = ac.Gens(j);
-    d_usopt(j) = -trace(ac.Y_(k) * value(W_us));
+    d_usopt(j) = trace(ac.Y_(k) * value(W_us));
     d_dsopt(j) = -trace(ac.Y_(k) * value(W_ds));
 end
 d_usopt = normV(d_usopt);
@@ -304,9 +197,9 @@ d_dsopt = normV(d_dsopt);
 
 format_result(ac, wind, t, {W_fopt, W_sscen, R_usopt, R_dsopt, d_usopt, d_dsopt}, R_opt);
 
+PGvsPW('p7', W_fopt, value(W_us), value(W_ds));
 
-[problem, info] = simulate_network(ac, wind, W_fopt, d_usopt, d_dsopt, t, 1, tol);
-% verify(not(problem), info);
+simulate_network(ac, wind, W_fopt, d_usopt, d_dsopt, t, 1, tol);
 solutions(3) = struct('Name', 'P2',...
                    'Cost', cost,...
                    'PGCost', objective_PG(W_fopt),...
@@ -365,10 +258,10 @@ for i = 1:N
         C = [C, -R_ds(j) ...
              <= trace(ac.Y_k(k)*(W_s{i}-W_f)) - ac.C_w(k)*wind.P_m(t, i) <= ...
                 R_us(j)];  
-        if i == 1
-            C = [C, trace(ac.Y_(k) * W_us) <= 0];
-            C = [C, trace(ac.Y_(k) * W_ds) <= 0];
-        end
+%         if i == 1
+%             C = [C, trace(ac.Y_(k) * W_us) <= 0];
+%             C = [C, trace(ac.Y_(k) * W_ds) <= 0];
+%         end
         
     end
     

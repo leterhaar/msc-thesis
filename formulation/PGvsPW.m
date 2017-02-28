@@ -59,9 +59,25 @@ function PGvsPW(type, varargin)
                 PGs(i,j) = trace(ac.Y_k(k)*W_s) - ac.C_w(k)*(Pms(i) + Pwf) + ac.P_D(t, k);
             end
         end
+        
+    elseif strcmpi(type, 'p7')
+        W_f = varargin{1};
+        W_us = varargin{2};
+        W_ds = varargin{3};
+        
+        for i = 1:length(Pms)
+            W_s = W_f + max(-Pms(i),0)*W_us + max(Pms(i),0)*W_ds;
+            
+            for j = 1:ac.N_G
+                k = ac.Gens(j);
+                PGs(i,j) = trace(ac.Y_k(k)*W_s) - ac.C_w(k)*(Pms(i) + Pwf) + ac.P_D(t, k);
+            end
+            
+        end       
     else
         error('Unknown type: %s', type);
     end
+    
     
     % plot
     initfig('P^G + R vs P^m', str2double(type(end)));

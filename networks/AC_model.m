@@ -404,6 +404,14 @@ classdef AC_model < handle
             res = obj.Ybar_k(k);
         end
         
+        function Ysum = Y_sum(obj)
+            % get sum of Y_k over all gens
+            Ysum = zeros(2*obj.N_b);
+            for k = obj.Gens'
+                Ysum = Ysum + obj.Y_(k);
+            end
+        end
+        
         function [bags, tw] = get_bags(obj, alpha)
             if isempty(obj.bags)
                 if nargin < 2

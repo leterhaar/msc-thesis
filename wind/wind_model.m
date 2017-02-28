@@ -230,6 +230,30 @@ classdef wind_model < handle
                 obj.(propname{1}) = saved_model.obj.(propname{1});
             end
         end
+
+        function get_extremes(obj)
+        % returns the extreme values using Alg 1
+            assert(not(isempty(obj.P_w)), 'Please generate scenarios first');
+            T = size(obj.P_w, 1);
+            obj.P_mpos = zeros(T, 2);
+            obj.P_mneg = zeros(T, 2);
+            Pmnew = zeros(T, 2);
+            Pwnew = zeros(T, 2);
+            for t = 1:T
+                
+                [obj.P_mpos(t, 1), i_max] = max([0 obj.P_m(t, :)]);
+                obj.P_mneg(t, 1) = 0;
+                obj.P_mpos(t, 2) = 0;
+                [obj.P_mneg(t, 2), i_min] = min([0 obj.P_m(t, :)]);
+                Pmnew(t, 1) = obj.P_m(t, i_max);
+                Pmnew(t, 2) = obj.P_m(t, i_min);
+                Pwnew(t, 1) = obj.P_w(t, i_max);
+                Pwnew(t, 2) = obj.P_w(t, i_min);
+            end
+            obj.P_m = Pmnew;
+            obj.P_w = Pwnew;
+        end
+
         
     end
  

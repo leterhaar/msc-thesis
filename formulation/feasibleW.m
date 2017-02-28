@@ -61,7 +61,7 @@ function C = feasibleW(W_s, P_w, ac, notation)
 
         for l = 1:ac.N_l
             % apparent line flow constraints
-            if isa(ac.lineflows(l, W_s), 'constraint')
+            if not(isa(ac.lineflows(l, W_s), 'double'))
                 C = [C, (ac.lineflows(l, W_s) <= 0):sprintf('lineflows l%i t%i', l, t)];
             end
         end
